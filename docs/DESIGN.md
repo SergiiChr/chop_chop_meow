@@ -1345,6 +1345,8 @@ The player sees every building, since the build menu lists them all, and every r
 They also see what a built station makes, what their backpack holds, what a goal in the Goal Log names, and what is
 gathered from things the settlement remembers, things in sight it does not remember such as firebugs, and explored
 beach sand.
+`MapDiscovery.ReadSeen` reads what the settlement has seen once, as the map opens, so what is first seen while it
+is open shows the next time it opens.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.

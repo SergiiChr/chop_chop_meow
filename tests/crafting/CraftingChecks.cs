@@ -977,7 +977,7 @@ public static class CraftingChecks {
         Require(world.MapDiscovery.Of("canned_jam") == MapState.NotMade, "a built canning station should show the canned jam it makes");
     }
 
-    /// <summary>What a player holds and the resources the settlement has seen show on the map.</summary>
+    /// <summary>What a player holds shows on the map, and the resources the settlement has seen show once the map opens.</summary>
     private static void CheckHeldItemsAndSeenResourcesShowOnTheRecipeMap(GameData data) {
         var world = EmptyWorld(data);
         Require(world.MapDiscovery.Of("canned_meat_stew") == MapState.Undiscovered, "canned stew nobody holds should stay undiscovered");
@@ -990,10 +990,13 @@ public static class CraftingChecks {
         world.Add(ThingKind.Nettle, world.Player + Vector2.Right * 2, 1);
         world.Add(ThingKind.Firebug, world.Player + Vector2.Left * 2, 1);
         world.Look();
+        Require(world.MapDiscovery.Of("nettle") == MapState.Undiscovered, "a nettle seen while the map is open should wait for the map to open again");
+        world.MapDiscovery.ReadSeen();
         Require(world.MapDiscovery.Of("nettle") == MapState.NotMade, "a nettle the player has seen should show on the map");
         Require(world.MapDiscovery.Of(Firebugs.Item) == MapState.NotMade, "a firebug in the player's sight should show on the map");
         world.Player = Enumerable.Range(0, Terrain.Size * Terrain.Size).Select(i => new Vector2(i % Terrain.Size, i / Terrain.Size)).First(Beach.IsSand);
         world.Look();
+        world.MapDiscovery.ReadSeen();
         Require(world.MapDiscovery.Of(Beach.Sand) == MapState.NotMade, "beach sand the player has seen should show on the map");
     }
 }

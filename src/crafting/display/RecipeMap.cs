@@ -56,6 +56,7 @@ public partial class RecipeMap : Control {
         item = world.Data.MapEntryOf(item);
         if (item != "" && !world.Data.Items.ContainsKey(item) && !world.Data.IsBuilding(item)) return;
         Clear();
+        world.MapDiscovery.ReadSeen();
         this.leaveGoalLog = leaveGoalLog;
         var column = mainView = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
         column.AddChild(Header());

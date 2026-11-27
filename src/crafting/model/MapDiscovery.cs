@@ -20,9 +20,8 @@ public sealed class MapDiscovery {
     private readonly Dictionary<string, List<string>> shownWith = new();
     /// <summary>The goals that name each item.</summary>
     private readonly Dictionary<string, List<GoalId>> namedBy = new();
-    /// <summary>The items gathered from what the settlement has seen, worked out again when what it has seen changes.</summary>
+    /// <summary>The items gathered from what the settlement has seen, as <see cref="ReadSeen"/> last found them.</summary>
     private readonly HashSet<string> seen = new();
-    private (int Remembered, int Explored, float Time) seenAt = (-1, -1, -1);
     private bool sandSeen;
 
     public MapDiscovery(World world) {
@@ -53,7 +52,6 @@ public sealed class MapDiscovery {
         if (Made(item)) return MapState.Made;
         if (alwaysShown.Contains(item)) return MapState.NotMade;
         if (!shownWith.TryGetValue(item, out var roots)) return MapState.Undiscovered;
-        RefreshSeen();
         foreach (string root in roots) if (Shown(root)) return MapState.NotMade;
         return MapState.Undiscovered;
     }
@@ -76,13 +74,11 @@ public sealed class MapDiscovery {
     }
 
     /// <summary>
-    /// Gathers again the items of everything the settlement remembers seeing, of the things in sight it does not remember
-    /// such as firebugs, and the beach's sand once explored ground holds some.
+    /// Reads the items of everything the settlement remembers seeing, of the things in sight it does not remember such
+    /// as firebugs, and the beach's sand once explored ground holds some.
+    /// The recipe map reads them as it opens, so what is first seen while it is open shows the next time it opens.
     /// </summary>
-    private void RefreshSeen() {
-        var now = (world.S.Remembered.Count, world.ExploredRevision, world.Time);
-        if (now == seenAt) return;
-        seenAt = now;
+    public void ReadSeen() {
         seen.Clear();
         foreach (var memory in world.S.Remembered.Values) AddSeen(memory.Kind);
         foreach (var thing in world.S.Things) if (!thing.TakesGround && world.Sees(thing.Pos)) AddSeen(thing.Kind);
