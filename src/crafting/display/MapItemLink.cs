@@ -9,12 +9,15 @@ namespace ChopChopMeow;
 /// </summary>
 internal partial class MapItemLink(World world, string item, string hint = "", string? role = null) : ItemSlot {
     public const string QuestionMark = "?";
+    private static readonly Color NotMadeTint = new(.78f, .78f, .78f, .75f);
     // Every look a chip's icon takes, so a chip not made yet stays grey while hovered or pressed.
     private static readonly StringName[] IconColors = [
         "icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color",
     ];
     public MapState State { get; private set; } = world.MapDiscovery.Of(item);
     public bool Shown => State != MapState.Undiscovered;
+    /// <summary>The tint for the link's picture, which greys it until someone makes the item.</summary>
+    public Color Tint => State == MapState.NotMade ? NotMadeTint : Colors.White;
     public Action<string, Texture2D?>? PresentIdentity { get; set; }
     /// <summary>Raised once, when the name and icon first show.</summary>
     public event Action? Discovered;
@@ -45,8 +48,7 @@ internal partial class MapItemLink(World world, string item, string hint = "", s
         } else {
             Text = Shown ? "" : QuestionMark;
             Icon = icon;
-            var tint = State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
-            foreach (var look in IconColors) AddThemeColorOverride(look, tint);
+            foreach (var look in IconColors) AddThemeColorOverride(look, Tint);
         }
     }
 }

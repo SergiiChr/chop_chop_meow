@@ -70,7 +70,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         card.PresentIdentity = (caption, texture) => {
             bool shown = card.Shown;
             icon.Texture = texture;
-            icon.SelfModulate = State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
+            icon.SelfModulate = card.Tint;
             name.Text = caption;
             name.HorizontalAlignment = shown ? HorizontalAlignment.Left : HorizontalAlignment.Center;
             name.Position = shown ? new Vector2(56, 4) : ItemIcon.Position;

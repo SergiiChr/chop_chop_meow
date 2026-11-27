@@ -112,7 +112,7 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         card.PresentIdentity = (caption, texture) => {
             icon.Texture = texture;
             icon.Visible = card.Shown;
-            icon.SelfModulate = card.State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
+            icon.SelfModulate = card.Tint;
             name.Text = caption;
             name.HorizontalAlignment = card.Shown ? HorizontalAlignment.Left : HorizontalAlignment.Center;
         };

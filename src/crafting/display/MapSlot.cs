@@ -14,8 +14,6 @@ public partial class MapSlot : Control {
     private static readonly StyleBoxFlat OnLight = Style.Flat(Style.Line, 12, 0);
     private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.SlotFill, .14f), 12, 0);
     private static readonly StyleBoxFlat NotMadeSlot = Style.Flat(new Color(Style.SlotFill, .55f), 14, 3, new Color(Style.Line, .6f), 2);
-    /// <summary>The tint that greys the picture of an item not made yet.</summary>
-    public static readonly Color NotMadeTint = new(.78f, .78f, .78f, .75f);
 
     public override void _Ready() {
         if (State != MapState.Undiscovered) return;

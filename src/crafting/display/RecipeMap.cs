@@ -336,7 +336,7 @@ public partial class RecipeMap : Control {
         icon.AddChild(hidden);
         icon.PresentIdentity = (_, texture) => {
             icon.Icon = texture;
-            icon.SelfModulate = icon.State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
+            icon.SelfModulate = icon.Tint;
             hidden.Visible = !icon.Shown;
         };
         icon.Pressed += () => Jump(item);
