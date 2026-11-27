@@ -62,7 +62,8 @@ public sealed class StrikePoints {
             added.Enqueue(key);
         }
         parts.Clear();
-        AddParts(prop.Body);
+        // A struck rock slides a little to the side for a moment as it shakes: its spot is found where it rests, so a blow aimed mid-shake still lands on it.
+        AddParts(prop.Body, WorldView.Mined(subject.Kind) ? prop.Root.GlobalTransform.Basis * prop.Body.Position : Vector3.Zero);
         var meshes = CollectionsMarshal.AsSpan(parts);
         var rig = new Transform3D(Basis.FromEuler(new Vector3(0, ActorAnimation.Yaw(subject.Pos - from, 0), 0)), WorldView.To3(from));
         var spot = action == ActorAction.Dig ? AtTheFoot(subject, from, prop, meshes)
@@ -190,14 +191,15 @@ public sealed class StrikePoints {
         return reach;
     }
 
-    /// <summary>Adds the meshes drawn under a node to <see cref="parts"/>, walking its children by index.</summary>
-    private void AddParts(Node node) {
+    /// <summary>Adds the meshes drawn under a node to <see cref="parts"/>, walking its children by index, each moved back by <paramref name="shaken"/>.</summary>
+    private void AddParts(Node node, Vector3 shaken) {
         if (node is MeshInstance3D { Mesh: Mesh mesh, Visible: true } drawn) {
             if (!triangles.TryGetValue(mesh, out var corners)) triangles[mesh] = corners = Corners(mesh);
             var place = drawn.GlobalTransform;
+            place.Origin -= shaken;
             parts.Add(new Part(corners, mesh.GetAabb().Grow(BoxMargin), place, place.AffineInverse()));
         }
-        for (int i = 0; i < node.GetChildCount(); i++) AddParts(node.GetChild(i));
+        for (int i = 0; i < node.GetChildCount(); i++) AddParts(node.GetChild(i), shaken);
     }
 
     /// <summary>

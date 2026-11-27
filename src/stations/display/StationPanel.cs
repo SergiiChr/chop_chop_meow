@@ -16,9 +16,9 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
     private ProcessRow work = null!;
 
     protected override void Body() {
-        // A station's own tool slots sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
+        // A station's own tool slots sit in the Tools window beside the page: what is slotted sets which recipes workers can run and how fast.
         var slotted = world.SlotRules(thing.Kind);
-        if (slotted.Length > 0) ToolWindow(slotted);
+        if (slotted.Length > 0) ToolSlots(slotted);
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : world.Selected(thing);
         opened = true;
@@ -43,9 +43,9 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         JobButtons();
     }
 
-    /// <summary>The window left of the page with the station's tool slots, each named with the tool it holds.</summary>
-    private void ToolWindow(ToolSlotRule[] slots) {
-        var window = panel.ShowAside(190);
+    /// <summary>The station's tool slots in the Tools window left of the page, each named with the tool it holds.</summary>
+    private void ToolSlots(ToolSlotRule[] slots) {
+        var window = panel.ShowTools(190);
         window.AddChild(Style.Heading("Available tools", 19));
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); window.AddChild(Style.InWell(column));
         foreach (var slot in slots) {
