@@ -39,6 +39,7 @@ public static class CraftingChecks {
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
         Test(CheckStationsShowWithTheirWholeBuildCostOnTheRecipeMap, data);
+        Test(CheckABuiltCraftingBenchShowsEveryToolOnTheRecipeMap, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchWorksWithACarriedOrSlottedToolWhicheverIsFaster, data);
         Test(CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf, data);
@@ -941,6 +942,19 @@ public static class CraftingChecks {
         foreach (var w in world.Workers.ToList()) world.Fire(w);
         SafeTick(world, 5);
         Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
+    }
+
+    /// <summary>Building a crafting bench shows every tool on the map, with what it is made of.</summary>
+    private static void CheckABuiltCraftingBenchShowsEveryToolOnTheRecipeMap(GameData data) {
+        var world = EmptyWorld(data);
+        string[] tools = ["steel_shovel", "rake", "lantern", "bug_net", "mortar", "torch"];
+        foreach (string tool in tools)
+            Require(world.MapDiscovery.Of(tool) == MapState.Undiscovered, $"the {tool} should stay undiscovered before a crafting bench is built");
+        Achieve(world, "bench");
+        foreach (string tool in tools)
+            Require(world.MapDiscovery.Of(tool) == MapState.NotMade, $"a built crafting bench should show the {tool} on the map");
+        Require(world.MapDiscovery.Of("nettle_rope") == MapState.NotMade, "the nettle rope a bug net is made of should show with it");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.Undiscovered, "a built crafting bench should leave canned jam undiscovered");
     }
 
     /// <summary>A new settlement sees every station on the map, with its build cost followed down to ingredients and fuel.</summary>

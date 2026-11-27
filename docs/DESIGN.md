@@ -1343,6 +1343,7 @@ when none does.
 A chain is the entry and, followed all the way down, its build cost, recipe ingredients, fuels and plainest tool, or the
 `From` and `Also` items of its source.
 Every station some recipe is made at has its chain shown from a new game.
+Every recipe in the Tools group has its chain shown once the settlement has built a crafting bench.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.

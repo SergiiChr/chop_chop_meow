@@ -12,6 +12,8 @@ public enum MapState { Undiscovered, NotMade, Made }
 public sealed class MapDiscovery {
     private readonly World world;
     private readonly HashSet<string> stationChains = new();
+    /// <summary>The chains of every tool the crafting menu lists, which show once a crafting bench is built.</summary>
+    private readonly HashSet<string> toolChains = new();
     /// <summary>
     /// The goals whose chain holds each entry, so an entry shows once any of them is in the Goal Log.
     /// </summary>
@@ -20,6 +22,8 @@ public sealed class MapDiscovery {
     public MapDiscovery(World world) {
         this.world = world;
         foreach (var station in world.StationKinds) AddChain(station.Id(), stationChains);
+        foreach (var recipe in world.Data.Recipes.Values)
+            if (recipe.Group == RecipeGroup.Tools) AddChain(recipe.Output, toolChains);
         foreach (var goal in Goals.Entries) {
             var chain = new HashSet<string>();
             foreach (string item in goal.Items) AddChain(item, chain);
@@ -40,9 +44,13 @@ public sealed class MapDiscovery {
     private bool Made(string item) =>
         world.Data.IsBuilding(item) ? world.Reached(item) : world.Data.Items.ContainsKey(item) && world.Had(item);
 
-    /// <summary>Whether a station's chain or the chain of a goal in the Goal Log holds the entry.</summary>
+    /// <summary>
+    /// Whether a station's chain, a tool's chain once a crafting bench is built, or the chain of a goal in the Goal Log
+    /// holds the entry.
+    /// </summary>
     private bool InShownChain(string item) {
         if (stationChains.Contains(item)) return true;
+        if (toolChains.Contains(item) && world.Reached(ThingKind.Bench.Id())) return true;
         if (!goalChains.TryGetValue(item, out var goals)) return false;
         foreach (var goal in goals) if (world.Goals.Status(goal) != GoalStatus.Hidden) return true;
         return false;
