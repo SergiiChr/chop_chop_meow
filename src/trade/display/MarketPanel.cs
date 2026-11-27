@@ -35,7 +35,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), $"{StationSlots.SlotHint}\nPut a packed crate here to sell it", held => held.Stack is { Box: 0 } stack && world.CanSell(stack.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
-        var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.Where(world.CanSell).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
+        var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.Where(World.IsCrate).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
         sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("line_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
         sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         Style.SkinPill(sell, Style.Brick);

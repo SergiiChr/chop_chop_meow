@@ -27,8 +27,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             return (Held: held, Life: life, Bugs: bugs);
         }, shown => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
-            if (lantern) count.SetStack(shown.Held, shown.Bugs);
-            else count.Text = shown.Held > 0 ? shown.Held.ToString() : "";
+            count.SetStack(shown.Held, shown.Bugs);
             string hint = tooltip(shown.Held);
             cell.TooltipText = $"{hint}{PageText.FirebugLifeLine(shown.Life)}\n{RecipeMap.AltClickHint}";
         });
@@ -92,7 +91,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             bool burnable = recipe.Fuels.Contains(fuel);
             cell.Icon = Icons.Of(fuel);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 && burnable ? Colors.White : held > 0 ? Style.Brick : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
+            count.SetStack(held, -1);
             string hint = held > 0 && !burnable
                 ? $"Fuel · {world.Data.Name(fuel)} · {held}\n{recipe.Name} cannot burn it · take it out and load {burns}"
                 : $"Fuel · {(held > 0 ? world.Data.Name(fuel) : "empty")} · {held}/{burner.StackOf(fuel)}\nOne burns per batch · put {burns} here";

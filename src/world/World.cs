@@ -1565,7 +1565,7 @@ public sealed partial class World {
     }
     /// <summary>Sends the cart once every market slot holds a crate, for a post set to sell on its own.</summary>
     private void AutoSell(Thing sign) {
-        if (sign.AutoSell && sign.Inventory.Room(PackedPrefix) == 0 && S.Orders.Count < Carts && OutboundCrates(sign) == sign.Inventory.Slots) Ship(sign);
+        if (sign.AutoSell && sign.Inventory.Room(PackedPrefix) == 0 && S.Orders.Count < Carts) Ship(sign);
     }
     /// <summary>Crates with goods that can still be sent to the village.</summary>
     internal int OutboundCrates(Thing sign) {
@@ -1588,16 +1588,22 @@ public sealed partial class World {
     /// <summary>What a sale pays at the given unit prices: every unit of a good the village takes, plus the crates, which go with the goods.</summary>
     public float SaleValue(Dictionary<string, int> goods, int crates, Func<string, float> price) =>
         crates * Data.Market.CratePrice + goods.Where(p => VillageBuys(p.Key)).Sum(p => p.Value * price(p.Key));
+    /// <summary>
+    /// Sends the post's crates on a cart.
+    /// An empty crate, left once the firebugs packed in it have died, goes along as a donation and pays nothing.
+    /// </summary>
     private bool Ship(Thing sign) {
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
-        if (crates.Count == 0) return false;
+        int empty = sign.Inventory["crate"];
+        if (crates.Count == 0 && empty == 0) return false;
         var goods = Contents(crates);
+        if (empty > 0) { goods["crate"] = goods.GetValueOrDefault("crate") + empty; sign.Inventory.Remove("crate", empty); }
         // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
         float price = SaleValue(goods, crates.Count, item => UnitPrice(item, false));
         foreach (var (item, quantity) in goods) if (VillageBuys(item)) S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
         foreach (var crate in crates) { sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate)); }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
-        S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
+        S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count + empty });
         Say($"Goods sent: {string.Join(", ", GoodsByKind(goods).Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
     }
     internal string Goods(IEnumerable<KeyValuePair<string, int>> goods) => string.Join(", ", GoodsByKind(goods).Select(p => $"{p.Value} {Data.Name(p.Key)}"));

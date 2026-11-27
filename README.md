@@ -1117,6 +1117,7 @@ The village pays for:
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
 The returning cart says what was donated.
+A crate whose firebugs have all died stays in the market as an empty crate, and the next cart takes it as a donation too.
 A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
