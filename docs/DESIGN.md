@@ -159,7 +159,6 @@ Simulation and data:
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
-| `src/containers/ContainerItem.cs` | The base item shared by every fill of a steel bucket or barrel |
 | `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
 | `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and the Haul job's water work: barrels filled and dry farm plots watered from the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
@@ -660,8 +659,9 @@ No hand recipe takes a liquid, which `GameData` checks.
 #### Steel barrels and buckets
 
 A barrel holds up to 50 liters of one liquid, water or jam.
-Its item id records its fill, so moving it between a player, a worker,
-the ground and a pile preserves its liquid without a separate packed inventory. A cabin can only use a water barrel.
+Holding liquid, it is an object whose contents keep the liters, so it keeps its liquid as it moves between a player, a
+worker, the ground and a pile.
+A cabin can only use a water barrel.
 The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
 A cabin's only storage slot holds the actual barrel item.
 The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
@@ -1613,7 +1613,7 @@ Manual transfers ignore those filters.
 A filter is a `FilterList`: its entries in the order they were named, each once, which the filter window's rows show.
 The window's item list runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
 `GameData.Create` works `ListOrder` out once: what is gathered, grown or bought comes first, then materials, tools, containers and food, by the recipe that makes each item.
-An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
+An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`Item.KindOf`), and a part-drunk bottle with the full one.
 In each group fewer making steps come first, and recipe map order breaks ties.
 Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
 Gathered water used to grow wheat adds no making steps.

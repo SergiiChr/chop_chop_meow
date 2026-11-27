@@ -145,7 +145,7 @@ public static class AllocationChecks {
         // The table's water is kept under ten liters: filled to its stack of 64, it would need no bottle for the rest of the check.
         // The warm-up covers a bottle coming back part full, whose status is built once.
         // A bottle filled for the first time since the world loaded becomes an object holding its water, about 1.3 KB once per bottle,
-        // and an emptied one is kept to fill again: the four empty bottles in their pile may first fill during the measured runs (measured 1.7 bytes a tick).
+        // and an emptied one is kept to fill again: the four empty bottles in their pile may first fill during the measured runs (measured 1.3 bytes a tick).
         Check("tick: cooking with water bottles", () => {
             kitchen.Tick(1 / 60f); Fed(kitchen); pantry.Inventory.Add("raw_meat", 64 - pantry.Inventory["raw_meat"]); pantry.Inventory.Add("wood", 64 - pantry.Inventory["wood"]);
             table.Inventory.Remove(Water.Liquid, Math.Max(0, table.Inventory[Water.Liquid] - 9));

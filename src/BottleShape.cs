@@ -13,6 +13,9 @@ internal static class BottleShape {
         _ => "293e46",
     }, .3f);
 
+    /// <summary>Whether a look id, as <see cref="Vessels.LookOf"/> gives, shows a bottle at some fill.</summary>
+    internal static bool IsBottle(string look) => System.Array.IndexOf(Water.Looks, look) >= 0 || System.Array.IndexOf(BerryJam.Looks, look) >= 0;
+
     /// <summary>The liters and liquid a bottle's look shows, such as two of water for <c>water_2</c>.</summary>
     private static (int Liters, Mark Filled) Contents(string look) {
         int jam = System.Array.IndexOf(BerryJam.Looks, look);

@@ -14,18 +14,11 @@ public static class Water {
     public static bool IsBottle(string item) => Item.IsKind(item, Empty);
 
     /// <summary>The liters of water a bottle in a box holds: 0 for an empty one, -1 for anything else, a bottle of jam included.</summary>
-    public static int BottleLiters(Inventory box, string item) =>
-        !IsBottle(item) ? -1 : box.Object(item) is not { } bottle ? 0 : Vessels.LiquidIn(bottle) == Liquid ? Vessels.LitersIn(bottle) : -1;
+    public static int BottleLiters(Inventory box, string item) => Vessels.LitersOf(box, item, Empty, Liquid);
 
     /// <summary>Finds a bottle with room for water, an empty one first and then the least full, among those no player holds; null when every bottle is full.</summary>
-    public static string? FindBottle(Inventory inventory) {
-        if (inventory.Free(Empty) > 0) return Empty;
-        string? least = null;
-        int fewest = int.MaxValue;
-        foreach (var (item, _) in inventory.Items)
-            if (BottleLiters(inventory, item) is > 0 and < Capacity and int liters && liters < fewest && inventory.Free(item) > 0) { least = item; fewest = liters; }
-        return least;
-    }
+    public static string? FindBottle(Inventory inventory) =>
+        inventory.Free(Empty) > 0 ? Empty : Vessels.Roomiest(inventory, Empty, Liquid, Capacity, fullest: false);
 
     /// <summary>Refills an empty bottle first, then a partial bottle. With no bottle, gathering at a source drinks one liter straight from it.</summary>
     public static WaterCollectResult CollectWater(World world, Thing source) {
@@ -43,18 +36,8 @@ public static class Water {
     }
 
     /// <summary>The bucket in the backpack with room for water, the fullest first and an empty one last, or null.</summary>
-    private static string? RoomyBucket(Inventory backpack) {
-        string? best = null;
-        int most = -1;
-        foreach (var (item, _) in backpack.Items) {
-            if (!Bucket.Is(item) || backpack.Free(item) == 0) continue;
-            var bucket = backpack.Object(item);
-            if (bucket != null && Vessels.LiquidIn(bucket) != Liquid) continue;
-            int liters = Vessels.LitersIn(bucket);
-            if (liters < Bucket.Capacity && liters > most && (bucket != null || backpack.RoomForFilled(Bucket.Item) > 0)) { best = item; most = liters; }
-        }
-        return best;
-    }
+    private static string? RoomyBucket(Inventory backpack) =>
+        Vessels.Roomiest(backpack, Bucket.Item, Liquid, Bucket.Capacity, fullest: true) ?? (backpack.RoomForFilled(Bucket.Item) > 0 ? Bucket.Item : null);
 
     internal static bool HasBucketRoom(Inventory backpack) => RoomyBucket(backpack) != null;
 

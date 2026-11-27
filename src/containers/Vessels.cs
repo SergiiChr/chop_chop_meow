@@ -14,26 +14,28 @@ public sealed partial class World {
     /// object in its own cell, or in a free one when it came from a stack; emptied, it turns back into a plain container.
     /// Returns the item it is now, or null when no cell had room.
     /// </summary>
-    /// <param name="keepCell">A unit from a stack becomes the object in that cell, and the rest of the stack moves to others.</param>
-    internal string? SetFill(Inventory box, string item, string liquid, int liters, bool keepCell = false) {
+    /// <param name="cell">
+    /// The cell whose unit of a plain container fills, or -1 for any: a unit from a stack becomes the object in that
+    /// cell, and the rest of the stack moves to others.
+    /// </param>
+    internal string? SetFill(Inventory box, string item, string liquid, int liters, int cell = -1) {
         string container = Item.KindOf(item);
         if (box.Object(item) is { } unit) {
             unit.Contents!.Clear();
             if (liters <= 0) {
-                box.Unpack(item);
-                emptied.Push(unit);
+                if (box.Unpack(item)) emptied.Add(unit);
                 return container;
             }
             unit.Contents.Add(liquid, liters);
             return item;
         }
         if (liters <= 0) return item;
-        int capacity = container == Barrel.Item ? Barrel.Capacity : Data.VesselOf(container, liquid)!.Capacity;
+        int capacity = Data.CapacityOf(container, liquid)!.Value;
         var filled = Reused(container, capacity) ?? Vessels.Holding(container, S.NextId++, capacity, liquid, 0);
         filled.Contents!.Add(liquid, liters);
-        if (box.FillOne(container, filled, keepCell)) return filled.Key;
+        if (box.FillOne(container, filled, cell)) return filled.Key;
         filled.Contents.Clear();
-        emptied.Push(filled);
+        emptied.Add(filled);
         return null;
     }
 
@@ -41,21 +43,18 @@ public sealed partial class World {
     /// Vessels emptied since the world loaded, which nothing holds any more: filling one again reuses it, number and all, so a
     /// bottle going round the lake and the cooking table makes nothing new once each has been filled.
     /// </summary>
-    private readonly Stack<Item> emptied = new();
+    private readonly List<Item> emptied = new();
 
-    /// <summary>An emptied vessel of this kind and capacity to fill again, or null.</summary>
+    /// <summary>The emptied vessel of this kind and capacity put aside last, to fill again, or null.</summary>
     private Item? Reused(string container, int capacity) {
-        foreach (var unit in emptied)
-            if (unit.Kind == container && unit.Contents!.Capacity == capacity) {
-                // A stack pops only its top, so the one found is taken out by moving the others aside.
-                while (emptied.Peek() != unit) reshelved.Push(emptied.Pop());
-                emptied.Pop();
-                while (reshelved.Count > 0) emptied.Push(reshelved.Pop());
-                return unit;
-            }
+        for (int i = emptied.Count - 1; i >= 0; i--) {
+            var unit = emptied[i];
+            if (unit.Kind != container || unit.Contents!.Capacity != capacity) continue;
+            emptied.RemoveAt(i);
+            return unit;
+        }
         return null;
     }
-    private readonly Stack<Item> reshelved = new();
 
     /// <summary>A full vessel standing for any of its kind, kept to ask where one would go without making a new one; it lies in no box.</summary>
     internal Item FullVessel(VesselDef v) {
@@ -66,11 +65,11 @@ public sealed partial class World {
 
     /// <summary>Whether a cell holds a container like this one: of its kind, holding as many liters of the same liquid, and free to take.</summary>
     private static bool Alike(Inventory.Slot slot, string container, string liquid, int liters) =>
-        slot.Free > 0 && slot.Units is [{ } unit] && unit.Kind == container && Vessels.LiquidIn(unit) == liquid && Vessels.LitersIn(unit) == liters;
+        slot.Free > 0 && Vessels.Holds(slot, container, liquid, liters);
 
     /// <summary>The free units of an item a load can take together: for a container holding a liquid, every one like it in the box, as one stack of them was.</summary>
-    internal static int FreeLike(Inventory box, string item) {
-        var unit = box.Object(item);
+    /// <param name="unit">The object the item's key finds in the box.</param>
+    internal static int FreeLike(Inventory box, string item, Item? unit) {
         if (Holding(unit) is not var (container, liquid)) return box.Free(item);
         int liters = Vessels.LitersIn(unit), count = 0;
         foreach (var slot in box.Layout) if (Alike(slot, container, liquid, liters)) count++;
@@ -91,7 +90,10 @@ public sealed partial class World {
     private readonly List<string> alike = new();
 
     /// <summary>Whether an item in a box is food: food itself, or a vessel holding a liquid eaten from it, such as a bottle of jam.</summary>
-    internal bool IsFood(Inventory box, string item) => Data.IsFood(item) || FoodVessel(item, box.Object(item));
+    internal bool IsFood(Inventory box, string item) => IsFood(item, box.Object(item));
+    /// <summary>Whether an item is food: food itself, or a vessel whose object holds a liquid eaten from it.</summary>
+    /// <param name="unit">The object the item's key finds in the box it comes from.</param>
+    internal bool IsFood(string item, Item? unit) => Data.IsFood(item) || FoodVessel(item, unit);
     /// <summary>Whether an object is a vessel holding a liquid eaten from it, such as a bottle of jam.</summary>
     private bool FoodVessel(string item, Item? unit) => Vessels.LiquidIn(unit) is string liquid && Data.VesselOf(item, liquid)?.Hunger > 0;
 
@@ -113,7 +115,7 @@ public sealed partial class World {
     private static void HoldersOf(Inventory box, VesselDef v, List<(string Item, int Liters)> found) {
         found.Clear();
         foreach (var slot in box.Layout)
-            if (slot.Units is [{ Contents: not null } unit] && unit.Kind == v.Empty && Vessels.LiquidIn(unit) == v.Liquid && slot.Free > 0) found.Add((slot.Item, Vessels.LitersIn(unit)));
+            if (slot.Free > 0 && Vessels.LitersOf(slot, v.Empty, v.Liquid) is > 0 and int liters) found.Add((slot.Item, liters));
         found.Sort(LeastFull);
     }
     private static readonly Comparer<(string Item, int Liters)> LeastFull = Comparer<(string Item, int Liters)>.Create((a, b) => a.Liters.CompareTo(b.Liters));
@@ -151,7 +153,7 @@ public sealed partial class World {
     }
 
     /// <summary>The liters of a liquid a box's vessels have room for.</summary>
-    private int VesselRoom(Inventory box, VesselDef v) {
+    internal int VesselRoom(Inventory box, VesselDef v) {
         int room = box.RoomForFilled(v.Empty) * v.Capacity;
         HoldersOf(box, v, holders);
         foreach (var (_, held) in holders) room += v.Capacity - held;
@@ -247,10 +249,6 @@ public sealed partial class World {
 
     /// <summary>The nearest storage with vessels that hold a liquid, fullest first, and that fill; or null.</summary>
     internal (string Item, Thing Source)? LiquidSource(VesselDef v, Vector2 from) => NearestFill(v, v.Capacity, 1, from);
-    /// <summary>The liters of a vessel's liquid an item holds: 0 for its empty container, -1 for anything else.</summary>
-    private static int FillOf(Inventory box, string item, VesselDef v) =>
-        item == v.Empty ? 0 : box.Object(item) is { Contents: not null } unit && unit.Kind == v.Empty && Vessels.LiquidIn(unit) == v.Liquid ? Vessels.LitersIn(unit) : -1;
-
     /// <summary>
     /// The first of a vessel's fills, from <paramref name="first"/> liters toward <paramref name="last"/>, that any storage or station gives out, and the nearest place that does.
     /// One pass over them, where <see cref="SourceFor"/> would take one for each fill.
@@ -265,8 +263,10 @@ public sealed partial class World {
         void Nearer(ThingKind kind, bool station) {
             foreach (var t in S.Things.Of(kind))
                 foreach (var (item, _) in t.Inventory.Items) {
-                    int liters = FillOf(t.Inventory, item, v), r = (liters - first) * step;
-                    if (liters < 0 || r < 0 || r > ranks || r > rank || t.Inventory.Free(item) <= 0 || !t.Inventory.AllowsWithdrawal(item) || station && Pending(t, item)) continue;
+                    if (!Item.IsKind(item, v.Empty)) continue;
+                    var unit = t.Inventory.Object(item);
+                    int liters = item == v.Empty ? 0 : Vessels.LitersOf(unit, v.Empty, v.Liquid), r = (liters - first) * step;
+                    if (liters < 0 || r < 0 || r > ranks || r > rank || t.Inventory.Free(item) <= 0 || !t.Inventory.AllowsWithdrawal(item, unit) || station && Pending(t, item)) continue;
                     float distance = t.Pos.DistanceSquaredTo(origin);
                     if (r < rank || distance < nearest) { best = t; bestItem = item; rank = r; nearest = distance; }
                 }
@@ -277,7 +277,7 @@ public sealed partial class World {
     internal bool CanDrain(Thing place, Inventory box, string item, string liquid) {
         if (!IsStation(place.Kind) || place.Inventory.Free(liquid) == 0 || Pending(place, liquid)) return false;
         foreach (var vessel in Data.Vessels)
-            if (vessel.Liquid == liquid && FillOf(box, item, vessel) is >= 0 and int held && held < vessel.Capacity) return true;
+            if (vessel.Liquid == liquid && Vessels.LitersOf(box, item, vessel.Empty, vessel.Liquid) is >= 0 and int held && held < vessel.Capacity) return true;
         return false;
     }
 

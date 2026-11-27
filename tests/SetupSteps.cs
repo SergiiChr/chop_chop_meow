@@ -49,7 +49,7 @@ internal static class SetupSteps {
     /// </summary>
     public static string StockVessel(World world, Inventory box, string container, string liquid, int liters, int count = 1) {
         if (liters <= 0) { Require(box.Add(container, count) == count, $"a box with room should take {count} {container}"); return container; }
-        int capacity = container == Barrel.Item ? Barrel.Capacity : world.Data.VesselOf(container, liquid)!.Capacity;
+        int capacity = world.Data.CapacityOf(container, liquid)!.Value;
         string key = "";
         for (int i = 0; i < count; i++) {
             var vessel = Vessels.Holding(container, world.S.NextId++, capacity, liquid, liters);

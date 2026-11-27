@@ -10,7 +10,7 @@ public sealed class Barrels(World world) {
     /// <summary>The liquid an item pours: a liquid itself, or what a bottle, bucket or barrel holds; null for anything else.</summary>
     /// <param name="unit">The object the item's key finds in the box it comes from.</param>
     internal static string? PouredLiquid(GameData data, string item, Item? unit) =>
-        data.VesselFor(item) != null ? item : Vessels.LitersIn(unit) > 0 && (Barrel.Is(item) || data.VesselOf(item) != null) ? Vessels.LiquidIn(unit) : null;
+        data.VesselFor(item) != null ? item : World.Holding(unit)?.Liquid;
 
     internal static bool CanPourWater(GameData data, string item, Item? unit) => PouredLiquid(data, item, unit) == Water.Liquid;
 
@@ -28,7 +28,7 @@ public sealed class Barrels(World world) {
         Item? filled = Barrel.IsFilled(item) ? source.TakeObject(item) : null;
         if (filled == null && (Barrel.IsFilled(item) || source.Remove(item, 1) != 1)) return null;
         var barrel = world.Add(ThingKind.Barrel, at, rotation: rotation);
-        if (filled != null) barrel.Inventory.Add(Barrel.LiquidOf(filled), Barrel.Liters(filled));
+        if (filled != null) barrel.Inventory.Add(Barrel.LiquidOf(filled), Vessels.LitersIn(filled));
         world.PileFilters(barrel);
         world.ClearGround(barrel);
         world.Play("place_building", at);
@@ -37,13 +37,13 @@ public sealed class Barrels(World world) {
 
     internal static int WaterIn(Thing t) => t.Kind switch {
         ThingKind.Barrel => t.Inventory[Water.Liquid],
-        ThingKind.Hut when Barrel.In(t.Inventory) is string barrel => Barrel.Liters(t.Inventory.Object(barrel)),
+        ThingKind.Hut when Barrel.In(t.Inventory) is string barrel => Vessels.LitersIn(t.Inventory.Object(barrel)),
         _ => 0,
     };
 
     internal static int Room(Thing t) => t.Kind switch {
         ThingKind.Barrel => t.Inventory.Room(Water.Liquid),
-        ThingKind.Hut when Barrel.In(t.Inventory) is string barrel && t.Inventory.Free(barrel) > 0 => Barrel.Capacity - Barrel.Liters(t.Inventory.Object(barrel)),
+        ThingKind.Hut when Barrel.In(t.Inventory) is string barrel && t.Inventory.Free(barrel) > 0 => Barrel.Capacity - Vessels.LitersIn(t.Inventory.Object(barrel)),
         _ => 0,
     };
 
@@ -55,7 +55,7 @@ public sealed class Barrels(World world) {
             t.Inventory.Add(Water.Liquid, put);
             world.PileFilters(t);
         } else if (Barrel.In(t.Inventory) is string barrel) {
-            world.SetFill(t.Inventory, barrel, Water.Liquid, Barrel.Liters(t.Inventory.Object(barrel)) + put);
+            world.SetFill(t.Inventory, barrel, Water.Liquid, Vessels.LitersIn(t.Inventory.Object(barrel)) + put);
         }
         return put;
     }
@@ -64,7 +64,7 @@ public sealed class Barrels(World world) {
     internal int TakeWater(Thing t, int liters) {
         if (t.Kind == ThingKind.Barrel) return t.Inventory.Remove(Water.Liquid, liters);
         if (Barrel.In(t.Inventory) is not string item || t.Inventory.Free(item) == 0) return 0;
-        int fill = Barrel.Liters(t.Inventory.Object(item)), taken = Math.Min(liters, fill);
+        int fill = Vessels.LitersIn(t.Inventory.Object(item)), taken = Math.Min(liters, fill);
         return taken > 0 && world.SetFill(t.Inventory, item, Water.Liquid, fill - taken) != null ? taken : 0;
     }
 }

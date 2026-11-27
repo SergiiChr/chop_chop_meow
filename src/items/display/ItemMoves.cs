@@ -69,8 +69,7 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
     /// A bottle holding something counts as its kind, while other objects, such as lanterns, stay.
     /// </summary>
     public int Materials(string id) =>
-        world.Data.Items.TryGetValue(ChopChopMeow.Item.IsKey(id) && World.IsContainer(ChopChopMeow.Item.KindOf(id)) ? ChopChopMeow.Item.KindOf(id) : id, out var def)
-        && def.Tool == "" && id != "crate" ? 999 : 0;
+        (!ChopChopMeow.Item.IsKey(id) || World.IsContainer(ChopChopMeow.Item.KindOf(id))) && world.Data.ItemDefinition(id) is { Tool: "" } && id != World.Crate ? 999 : 0;
 
     public void TakeAll(Thing t) {
         if (!InReach(t)) return;

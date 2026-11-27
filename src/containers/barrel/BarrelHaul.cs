@@ -25,11 +25,7 @@ internal sealed class BarrelHaul : PlaceHaul {
 
     public static bool Vessel(string item) => Bucket.Is(item) || Water.IsBottle(item);
     /// <summary>The liters of water a worker's bucket or bottle holds: 0 for an empty one, -1 for one holding something else or no vessel.</summary>
-    private static int WaterLiters(Worker w) {
-        if (!Vessel(w.Tool)) return -1;
-        var vessel = w.ToolSlot.Object(w.Tool);
-        return vessel == null ? 0 : Vessels.LiquidIn(vessel) == Water.Liquid ? Vessels.LitersIn(vessel) : -1;
-    }
+    private static int WaterLiters(Worker w) => Vessels.LitersOf(w.ToolSlot, w.Tool, Bucket.Is(w.Tool) ? Bucket.Item : Water.Empty, Water.Liquid);
 
     public static bool OnLadderOrRoof(Worker w, Thing target) => target.Kind == ThingKind.Hut && w.WaterTarget == target.Id
         && w.WaterAction is WorkerWaterAction.ClimbUp or WorkerWaterAction.Pour or WorkerWaterAction.ClimbDown;

@@ -22,11 +22,16 @@ public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
 
     /// <summary>Keeps a worker's two icon cells on what they carry and the tool they hold.</summary>
     protected void WatchKit(Worker w, ItemSlot carry, Badge carried, ItemSlot tool) {
-        live.Watch(() => { int count = w.Bag.Count; return (count, count > 0 ? w.Bag.First() : null, w.Tool); }, now => {
-            var (count, item, held) = now;
-            carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
+        // A vessel keeps its key as it fills or empties, so each icon follows the look of what it holds.
+        live.Watch(() => {
+            int count = w.Bag.Count;
+            string? item = count > 0 ? w.Bag.First() : null;
+            return (count, item, item == null ? null : Vessels.LookOf(world.Data, w.Bag, item), w.Tool, Vessels.LookOf(world.Data, w.ToolSlot, w.Tool));
+        }, now => {
+            var (count, item, carryLook, held, toolLook) = now;
+            carry.Icon = carryLook == null ? null : Icons.Of(carryLook); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
             carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
-            tool.Icon = held == "" ? null : Icons.Of(held); tool.Visible = held != "";
+            tool.Icon = held == "" ? null : Icons.Of(toolLook); tool.Visible = held != "";
             tool.TooltipText = held == "" ? "No tool in hand" : world.Data.Name(held);
         });
     }

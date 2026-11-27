@@ -132,7 +132,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         return Labelled(cell, perBatch);
     }
 
-    /// <summary>Shows lanterns together but takes one at a time, keeping the charge of each lantern.</summary>
+    /// <summary>Shows lanterns together but takes one at a time, each lantern keeping its own firebugs.</summary>
     private VBoxContainer LanternSlot(bool input, string perBatch, float size) {
         var box = t.Inventory;
         var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{Lanterns.Item}", size);

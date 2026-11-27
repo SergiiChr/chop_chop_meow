@@ -9,10 +9,10 @@ public static class Barrel {
     public static bool Is(string item) => ChopChopMeow.Item.IsKind(item, Item);
     /// <summary>Whether an item is a barrel holding some liquid, an object found by its key.</summary>
     public static bool IsFilled(string item) => ChopChopMeow.Item.IsKey(item) && Is(item);
-    public static int Liters(ChopChopMeow.Item? barrel) => barrel?.Contents?.Count ?? 0;
     /// <summary>The liquid a barrel holds, water for an empty one.</summary>
     public static string LiquidOf(ChopChopMeow.Item? barrel) => barrel?.Contents?.First() ?? Water.Liquid;
-    public static float Speed(ChopChopMeow.Item? barrel) => 1 - .5f * Liters(barrel) / Capacity;
+    /// <summary>The share of a walker's speed left to one carrying a barrel holding so many liters.</summary>
+    public static float Speed(int liters) => 1 - .5f * liters / Capacity;
     /// <summary>A barrel's name holding so many liters of a liquid.</summary>
     public static string Name(int liters, string liquid, GameData data) =>
         liters <= 0 ? data.Items[Item].Name : liquid == BerryJam.Liquid ? $"{data.Items[Item].Name} ({liters} L berry jam)" : $"{data.Items[Item].Name} ({liters} L)";

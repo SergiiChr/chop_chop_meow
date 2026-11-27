@@ -35,7 +35,7 @@ public sealed class Lanterns(World world) {
     /// <summary>The stack of living firebugs in this lantern, with their average game minutes left.</summary>
     internal (int Count, int AverageMinutes) FirebugStack(ChopChopMeow.Item? lantern) {
         int count = BugCount(lantern);
-        return (count, count == 0 ? 0 : world.Firebugs.MinutesLeft(lantern!.Contents!.AverageExpiry(Firebugs.Item)));
+        return (count, count == 0 ? 0 : world.Firebugs.AverageMinutes(lantern!.Contents!));
     }
 
     internal (int Count, int AverageMinutes) FirebugStack(InventoryView box, string? item) => FirebugStack(item == null ? null : box.Inventory.Object(item));

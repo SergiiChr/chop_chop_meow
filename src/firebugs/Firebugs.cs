@@ -37,13 +37,6 @@ public sealed class Firebugs(World world) {
     internal int AverageMinutes(Inventory box, int slot = -1) =>
         MinutesLeft(slot < 0 ? box.AverageExpiry(Item) : box.AverageExpiry(slot));
 
-    /// <summary>The average of some firebugs' death times, or 0 for none.</summary>
-    internal static float Average(ReadOnlySpan<float> expiries) {
-        double total = 0;
-        foreach (float expiry in expiries) total += expiry;
-        return expiries.IsEmpty ? 0 : (float)(total / expiries.Length);
-    }
-
     internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
 
     /// <summary>Clears dead bugs from the inventories that can hold them, and from the lanterns and crates in them, when the next catch expires.</summary>

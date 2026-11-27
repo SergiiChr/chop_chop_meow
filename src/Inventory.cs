@@ -191,7 +191,7 @@ public sealed class Inventory {
         if (items.Count == 0) return null;
         string? held = null;
         foreach (var slot in Layout) {
-            if (slot.Item == "" || !ChopChopMeow.Item.IsKind(slot.Item, kind) || withdrawal && !AllowsWithdrawal(slot.Item)) continue;
+            if (slot.Item == "" || !ChopChopMeow.Item.IsKind(slot.Item, kind) || withdrawal && !AllowsWithdrawal(slot.Item, slot.Units?[0])) continue;
             if (slot.Free > 0) return slot.Item;
             held ??= slot.Item;
         }
@@ -380,6 +380,12 @@ public sealed class Inventory {
         return 0;
     }
 
+    /// <summary>Lowers an item's total by <paramref name="count"/>, and drops it once none is left.</summary>
+    private void Lower(string item, int count) {
+        int left = this[item] - count;
+        if (left <= 0) items.Remove(item); else items[item] = left;
+    }
+
     private void SyncAggregate() {
         items.Clear(); foreach (var s in Layout) if (s.Item != "") items[s.Item] = items.GetValueOrDefault(s.Item) + s.Count;
         KeepSpareSlot();
@@ -444,7 +450,9 @@ public sealed class Inventory {
     public void GateNew() { Gated = true; InputFilter.Clear(); OutputFilter.Clear(); OutputFilter.Add(Everything); }
     /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate, whose goods its filter entry depends on.</param>
     public bool Accepts(string item, Item? unit = null) => Passes(InputFilter, item, unit);
-    public bool AllowsWithdrawal(string item) => Passes(OutputFilter, item, Object(item));
+    public bool AllowsWithdrawal(string item) => LetsAll(OutputFilter) || Names(OutputFilter, item, Object(item), ByKind);
+    /// <param name="unit">The object the item's key finds in this box.</param>
+    public bool AllowsWithdrawal(string item, Item? unit) => Passes(OutputFilter, item, unit);
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     /// <param name="unit">The object the item's key finds in the box it comes from.</param>
     public bool Wants(string item, Item? unit = null) => Names(InputFilter, item, unit, ByKind);
@@ -452,7 +460,11 @@ public sealed class Inventory {
     private static bool TopsUp(Slot slot, string item) => slot.Item == item && (slot.Held == 0 || !HasUnits(item));
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
-    private bool Passes(FilterList filter, string item, Item? unit) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item, unit, ByKind);
+    private bool Passes(FilterList filter, string item, Item? unit) => LetsAll(filter) || Names(filter, item, unit, ByKind);
+    /// <summary>
+    /// Whether a filter lets every item through: <see cref="Everything"/> in storage, or an empty one elsewhere.
+    /// </summary>
+    private bool LetsAll(FilterList filter) => Gated ? filter.Contains(Everything) : filter.Count == 0;
     /// <summary>A filter names an item itself, the kind of an object that is always one, such as a lantern, or a packed crate of the good it holds.</summary>
     private static bool Names(FilterList filter, string item, Item? unit, bool byKind) {
         if (World.PackedGood(unit) is string good) {
@@ -483,17 +495,27 @@ public sealed class Inventory {
         return null;
     }
 
-    /// <summary>Turns the cell of an object that holds nothing now, such as an unpacked crate, into a plain unit of its kind, keeping the cell and its hold.</summary>
-    internal void Unpack(string key) {
-        foreach (var slot in Layout) if (slot.Item == key && slot.Units is [{ Emptied: true }]) { MakePlain(slot); Changed?.Invoke(); return; }
+    /// <summary>
+    /// Turns the cell of an object that holds nothing now, such as an unpacked crate, into a plain unit of its kind,
+    /// keeping the cell and its hold; returns whether it did.
+    /// </summary>
+    internal bool Unpack(string key) {
+        foreach (var slot in Layout) if (slot.Item == key && slot.Units is [{ Emptied: true }]) { MakePlain(slot); Changed?.Invoke(); return true; }
+        return false;
     }
 
+    /// <summary>
+    /// Turns an emptied object's cell into a plain unit of its kind; the object keeps the cell's list for the next cell
+    /// that takes it.
+    /// </summary>
     private void MakePlain(Slot slot) {
-        string kind = slot.Units![0].Kind;
-        int left = this[slot.Item] - 1;
-        if (left == 0) items.Remove(slot.Item); else items[slot.Item] = left;
-        items[kind] = this[kind] + 1;
-        slot.Item = kind; slot.Units = null;
+        var units = slot.Units!;
+        var unit = units[0];
+        Lower(slot.Item, 1);
+        items[unit.Kind] = this[unit.Kind] + 1;
+        slot.Item = unit.Kind; slot.Units = null;
+        units.Clear();
+        unit.Cell = units;
     }
 
     /// <summary>Takes out the object found by this key, unless a player holds it.</summary>
@@ -545,8 +567,7 @@ public sealed class Inventory {
     private int Take(string item, int quantity, bool spent) {
         if (HasUnits(item)) return TakeUnits(item, quantity, default, spent);
         int amount = Math.Min(Math.Max(0, quantity), Free(item));
-        if (amount == this[item]) items.Remove(item);
-        else items[item] -= amount;
+        Lower(item, amount);
         int left = amount;
         if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == item) left -= RemoveFromSlot(Layout[PreferredSlot], left, spent);
         for (int i = Layout.Count - 1; i >= 0 && left > 0; i--) if (i != PreferredSlot && Layout[i].Item == item) left -= RemoveFromSlot(Layout[i], left, spent);
@@ -572,16 +593,18 @@ public sealed class Inventory {
         Slot slot = Layout[slotIndex]; int quantity = slot.Count;
         if (quantity > StackOf(newItem)) return false;
         slot.Item = newItem;
-        items[oldItem] -= quantity; if (items[oldItem] <= 0) items.Remove(oldItem);
+        Lower(oldItem, quantity);
         items[newItem] = items.GetValueOrDefault(newItem) + quantity;
         Changed?.Invoke();
         return true;
     }
 
-    /// <summary>The units of an empty container that could each become a filled one, an object taking a cell of its own.</summary>
+    /// <summary>
+    /// The units of an empty bottle or bucket that could each become a filled one, an object taking a cell of its own.
+    /// </summary>
     internal int RoomForFilled(string empty) {
         if (StackOf(empty) == 1) return Free(empty);
-        int room = Room(ChopChopMeow.Item.KeyOf(empty, 0), replacing: true), count = 0;
+        int room = Room(AnyFilled, replacing: true), count = 0;
         for (int i = Math.Min(Slots, Layout.Count) - 1; i >= 0; i--) {
             var slot = Layout[i];
             if (slot.Item != empty) continue;
@@ -595,6 +618,11 @@ public sealed class Inventory {
         return count;
     }
 
+    /// <summary>
+    /// A filled bottle's or bucket's key as a check of room sees it: an object that takes a cell of its own.
+    /// </summary>
+    private static readonly string AnyFilled = ChopChopMeow.Item.KeyOf(Bucket.Item, 0);
+
     /// <summary>Whether the rest of a cell's stack fits in other cells, as when one unit of it becomes an object in that cell.</summary>
     internal bool RoomForRest(int at) {
         if ((uint)at >= (uint)Layout.Count || Layout[at] is not { Item: not "" } slot) return false;
@@ -604,13 +632,19 @@ public sealed class Inventory {
     /// <summary>
     /// Turns one unit of an empty container, from <see cref="PreferredSlot"/> first, into an object holding something.
     /// A unit alone in its cell becomes the object there, keeping its hotbar slot; one from a stack goes to a free cell.
-    /// With <paramref name="keepCell"/>, the object takes the chosen unit's cell and the rest of its stack moves to others.
     /// </summary>
-    internal bool FillOne(string empty, Item filled, bool keepCell = false) {
+    /// <param name="cell">
+    /// The cell whose unit fills, or -1 for any: the object takes that cell and the rest of its stack moves to others.
+    /// </param>
+    internal bool FillOne(string empty, Item filled, int cell = -1) {
+        bool keepCell = cell >= 0;
+        int at = -1;
         // A unit that changes in its own cell is not taken out, so a hotbar binding does not keep it from filling there.
-        int Usable(Slot s) => keepCell ? s.Free : Takeable(s);
-        int at = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == empty && Usable(Layout[PreferredSlot]) > 0 ? PreferredSlot : -1;
-        if (at < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == empty && Usable(Layout[i]) > 0 && (at < 0 || Layout[i].Count == 1)) at = i;
+        if (keepCell) at = cell < Layout.Count && Layout[cell].Item == empty && Layout[cell].Free > 0 ? cell : -1;
+        else {
+            if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == empty && Takeable(Layout[PreferredSlot]) > 0) at = PreferredSlot;
+            if (at < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == empty && Takeable(Layout[i]) > 0 && (at < 0 || Layout[i].Count == 1)) at = i;
+        }
         if (at < 0) return false;
         var slot = Layout[at];
         int rest = slot.Count - 1;
@@ -619,9 +653,9 @@ public sealed class Inventory {
             Take(empty, 1, false);
             return Add(filled);
         }
-        int left = this[empty] - slot.Count;
-        if (left == 0) items.Remove(empty); else items[empty] = left;
-        slot.Item = filled.Key; slot.Count = 1; slot.Units = [filled];
+        Lower(empty, slot.Count);
+        slot.Item = filled.Key; slot.Count = 1; slot.Units = filled.TakeCell();
+        slot.Units.Add(filled);
         items[filled.Key] = 1;
         if (rest > 0) Add(empty, rest);
         else Changed?.Invoke();
@@ -647,7 +681,10 @@ public sealed class Inventory {
     }
 
     public int TransferTo(Inventory destination, string item, int quantity, bool automated = false) {
-        if (automated && (!AllowsWithdrawal(item) || !destination.Accepts(item, Object(item)))) return 0;
+        if (automated && !(LetsAll(OutputFilter) && destination.LetsAll(destination.InputFilter))) {
+            var unit = Object(item);
+            if (!AllowsWithdrawal(item, unit) || !destination.Accepts(item, unit)) return 0;
+        }
         int amount = Math.Min(Free(item), Math.Min(Math.Max(0, quantity), destination.Room(item)));
         if (HasUnits(item)) {
             var units = ArrayPool<Item>.Shared.Rent(amount);
@@ -683,8 +720,6 @@ public sealed class Inventory {
     }
 
     /// <summary>Takes out the soonest-to-expire free units of a kind into <paramref name="taken"/>, starting with the slot the player clicked.</summary>
-    internal int TakeUnits(string kind, Span<Item> taken) => TakeUnits(kind, taken.Length, taken, false);
-
     private int TakeUnits(string kind, int quantity, Span<Item> taken, bool spent) {
         if (quantity <= 0 || this[kind] == 0) return 0;
         int removed = 0;
@@ -704,8 +739,7 @@ public sealed class Inventory {
             TakeUnitsFrom(soonest, 1, taken, ref removed, spent);
         }
         if (removed > 0) {
-            int left = this[kind] - removed;
-            if (left == 0) items.Remove(kind); else items[kind] = left;
+            Lower(kind, removed);
             Changed?.Invoke();
         }
         return removed;
@@ -722,7 +756,7 @@ public sealed class Inventory {
 
     private static void AddUnitsTo(Slot slot, ReadOnlySpan<Item> added) {
         if (added.IsEmpty) return;
-        var units = slot.Units ??= new List<Item>();
+        var units = slot.Units ??= added[0].TakeCell();
         foreach (var unit in added) units.Add(unit);
         // The held units are reserved at the front. Anything that joins the stack while held sorts behind them.
         units.Sort(slot.Held, units.Count - slot.Held, Item.Soonest);
@@ -761,8 +795,7 @@ public sealed class Inventory {
             if (held == 0) slot.HeldBy = 0;
             units.RemoveRange(keep, gone);
             slot.Count -= gone;
-            int left = this[slot.Item] - gone;
-            if (left == 0) items.Remove(slot.Item); else items[slot.Item] = left;
+            Lower(slot.Item, gone);
             changed = true;
             if (slot.Count == 0) {
                 if (slot.Hotbar != 0) (UsedUp ??= new()).Add((slot.Hotbar, slot.Item));

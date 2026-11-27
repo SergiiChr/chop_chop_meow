@@ -253,7 +253,9 @@ public sealed partial class GameData {
     public static GameData Create() {
         var data = new GameData();
         data.Validate();
-        Inventory.Unstacked.Clear(); Inventory.Expiring.Clear();
+        Inventory.Unstacked.Clear(); Inventory.Expiring.Clear(); Item.Holders.Clear();
+        Item.Holders.Add(World.Crate); Item.Holders.Add(Barrel.Item);
+        foreach (var v in data.Vessels) Item.Holders.Add(v.Empty);
         foreach (var (id, item) in data.Items) if (item.LifeDays > 0) Inventory.Expiring.Add(id);
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
         // Empty bottles take a cell each, while empty buckets and barrels stack; one holding something is an object, a cell each.
@@ -261,7 +263,7 @@ public sealed partial class GameData {
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || GravelSpeed < 1 || GravelSpeed >= WolfChase || WolvesPerDen < 1 || WolfHealth <= 0 || WolfBite <= 0 || WolfTrot <= 0 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || !Items.ContainsKey(Water.Empty) || !Items.ContainsKey(Water.Full))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || GravelSpeed < 1 || GravelSpeed >= WolfChase || WolvesPerDen < 1 || WolfHealth <= 0 || WolfBite <= 0 || WolfTrot <= 0 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey(World.Crate) || !Items.ContainsKey(Water.Empty) || !Items.ContainsKey(Water.Full))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)
@@ -297,7 +299,7 @@ public sealed partial class GameData {
         }
         if (Market.CratePrice <= 0 || Market.Goods.Any(p => p.Value.Price <= 0 || p.Value.Sells == null && p.Value.Buys == null))
             throw new InvalidOperationException("Invalid market in GameData: every good it lists has a price and is taken or sold, and the crate has a price.");
-        if (Items.Values.Any(i => i.Speed <= 0 || i.LifeDays < 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Goods.Keys.Any(id => !Items.ContainsKey(id) || id == "coins" || id == "crate") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0 || i.LifeDays < 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Goods.Keys.Any(id => !Items.ContainsKey(id) || id == "coins" || id == World.Crate) || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in GameData.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
             throw new InvalidOperationException("Invalid mine or goals in GameData.");
@@ -341,6 +343,12 @@ public sealed partial class GameData {
     public VesselDef? VesselOf(string item) => vesselOf.GetValueOrDefault(Item.KindOf(item));
     /// <summary>The vessel a container is while holding a liquid, or null when it cannot hold that liquid.</summary>
     public VesselDef? VesselOf(string container, string liquid) => vesselHolding.GetValueOrDefault((Item.KindOf(container), liquid));
+    /// <summary>
+    /// The liters a container holds of a liquid when full: a barrel's for any liquid a vessel carries, the vessel's for
+    /// a bottle or bucket that can hold it, or null when the container cannot hold it.
+    /// </summary>
+    public int? CapacityOf(string container, string liquid) =>
+        container == Barrel.Item ? VesselFor(liquid) != null ? Barrel.Capacity : null : VesselOf(container, liquid)?.Capacity;
     // Filled by Validate: each liquid's vessel, each container's first vessel and each container's vessel for each liquid.
     private readonly Dictionary<string, VesselDef> vesselFor = new(), vesselOf = new();
     private readonly Dictionary<(string Container, string Liquid), VesselDef> vesselHolding = new();
@@ -451,7 +459,7 @@ public sealed partial class GameData {
     public string DescriptionLine(string item) => DescriptionOf(item) is { Length: > 0 } description ? "\n" + description : "";
     public string DescriptionOf(string item) => ItemDefinition(item)?.Description ?? "";
     /// <summary>An item's definition, or for an object found by its key, such as a lantern, its kind's.</summary>
-    private ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Item.KindOf(item));
+    internal ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Item.KindOf(item));
     /// <summary>Whether an id names an item, an object of one included.</summary>
     public bool HasItem(string id) => ItemDefinition(id) != null;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
@@ -484,7 +492,7 @@ public sealed partial class GameData {
     public bool IsBuilding(string id) => TryBuilding(id, out _);
     /// <summary>An item's name; a container holding something, which only its box can say more of, goes by its kind's name on the map, such as "Bottle".</summary>
     public string Name(string id) => World.IsCrate(id) ? Items[World.Crate].Name
-        : Item.IsKey(id) && Array.IndexOf(Item.Holders, Item.KindOf(id)) >= 0 ? NameOnMap(Item.KindOf(id))
+        : Item.IsKey(id) && Item.IsHolder(Item.KindOf(id)) ? NameOnMap(Item.KindOf(id))
         : ItemDefinition(id)?.Name ?? (Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' '));
     public string Name(ThingKind kind) {
         if (Items.TryGetValue(kind.Id(), out var item)) return item.Name;

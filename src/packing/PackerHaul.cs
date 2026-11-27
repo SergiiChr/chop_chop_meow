@@ -9,7 +9,7 @@ internal sealed class PackerHaul : PlaceHaul {
             Offer(ref best, TakeOut(t, shelf, CarryBox.Output, crate, 1, true));
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
-            if (free > 0 && !World.IsProduct(t.Packs, item) && item != "crate" && Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, false));
+            if (free > 0 && !World.IsProduct(t.Packs, item) && item != World.Crate && Taker(t, item, free, t.Inventory.Object(item)) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, false));
         }
         if (t.Packs == "") return;
         // A batch is one crate: a crate's worth of the good and one empty crate.

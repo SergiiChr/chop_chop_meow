@@ -47,6 +47,7 @@ public static class HaulingChecks {
         Test(CheckTheSecondFurnaceWorkerHaulsRecipeInputsAndStoresSteel, data);
         Test(CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem, data);
         Test(CheckHaulerFetchesInputsFromTheStationThatMadeThem, data);
+        Test(CheckHaulerCarriesABarrelOfWaterOutOfABenchToAPileOfThem, data);
         Test(CheckHaulerPoursWaterAndStoresTheEmptyBottle, data);
         Test(CheckHaulerTakesLeftoverWaterOutInBottles, data);
     }
@@ -573,6 +574,19 @@ public static class HaulingChecks {
         world.SetDuty(worker, bench, JobKind.Haul, true);
         Work(world, 30, () => bench.Inventory["steel_parts"] > 0);
         Require(bench.Inventory["steel_parts"] == 6 && anvil.Inventory["steel_parts"] == 0, "the bench's hauler should fetch the steel parts from the anvil's finished goods");
+    }
+
+    private static void CheckHaulerCarriesABarrelOfWaterOutOfABenchToAPileOfThem(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(20, 20), Barrel.Item);
+        var pile = world.Add(ThingKind.Pile, new Vector2(26, 20));
+        StockVessel(world, pile.Inventory, Barrel.Item, Water.Liquid, Barrel.Capacity);
+        world.Tick(.1f);
+        Require(world.PileFilter(pile) == World.HoldingOf(Barrel.Item, Water.Liquid), "a pile's first barrel of water should set it to barrels of water");
+        string barrel = StockVessel(world, bench.Inventory, Barrel.Item, Water.Liquid, 20);
+        Staff(world, bench, JobKind.Haul);
+        Work(world, 30, () => pile.Inventory[barrel] == 1);
+        Require(pile.Inventory[barrel] == 1 && bench.Inventory[barrel] == 0, "the bench's hauler should carry a barrel of water out to the pile of them");
     }
 
     private static void CheckHaulerPoursWaterAndStoresTheEmptyBottle(GameData data) {

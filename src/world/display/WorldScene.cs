@@ -313,7 +313,7 @@ public partial class WorldView {
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
         float speed = ReviewClips[ReviewClip].Name == "player barrel"
-            ? World.Data.WalkSpeed * Barrel.Speed(Vessels.Holding(Barrel.Item, 0, Barrel.Capacity, Water.Liquid, Barrel.Capacity)) : ReviewSpeed(action);
+            ? World.Data.WalkSpeed * Barrel.Speed(Barrel.Capacity) : ReviewSpeed(action);
         float along = Mathf.PosMod(Elapsed * speed + 20, 40) - 20;
         if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
         reviewActor.Update(track * along, action, track * (along + 1), dt);

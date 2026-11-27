@@ -9,7 +9,7 @@ public static class Icons {
 
     public static Texture2D? Of(string id) {
         if (World.IsCrate(id)) id = "crate";
-        else id = ContainerItem.Base(id == ThingKind.Barrel.Id() ? Barrel.Item : id);
+        else id = ChopChopMeow.Item.KindOf(id == ThingKind.Barrel.Id() ? Barrel.Item : id);
         if (cache.TryGetValue(id, out var cached)) return cached;
         // Items, buildings and the hard hat have icons rendered from their models; the line glyphs are drawn icons.
         foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })

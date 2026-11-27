@@ -14,8 +14,11 @@ public sealed class Item {
     internal static readonly IComparer<Item> Soonest = Comparer<Item>.Create((a, b) => a.Expires.CompareTo(b.Expires));
     /// <summary>The kinds whose every unit is an object found by its key, such as a lantern.</summary>
     internal static readonly string[] Keyed = [Lanterns.Item];
-    /// <summary>The kinds that are objects only while they hold something, such as a packed crate, and plain units of their kind once empty.</summary>
-    internal static readonly string[] Holders = [World.Crate, Water.Empty, Bucket.Item, Barrel.Item];
+    /// <summary>
+    /// The kinds that are objects only while they hold something, such as a packed crate, and plain units of their kind
+    /// once empty: the crate, the barrel and every vessel's container, filled from the data when it loads.
+    /// </summary>
+    internal static readonly HashSet<string> Holders = new();
     private const char KeyMark = '#';
 
     public string Kind { get; set; } = "";
@@ -25,6 +28,19 @@ public sealed class Item {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Expires { get; set; }
     /// <summary>What it holds, such as a lantern's firebugs, or null for nothing.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Inventory? Contents { get; set; }
+
+    /// <summary>
+    /// The list the cell this object last lay in kept it in, emptied, while no cell holds it; null otherwise.
+    /// </summary>
+    [JsonIgnore] internal List<Item>? Cell { get; set; }
+    /// <summary>
+    /// An empty list for the cell that takes this object to keep it in: the one its last cell kept, or a new one.
+    /// </summary>
+    internal List<Item> TakeCell() {
+        var list = Cell ?? new List<Item>();
+        Cell = null;
+        return list;
+    }
 
     /// <summary>The key a cell holding this object is found by: its kind and its number, such as lantern#17, made once.</summary>
     [JsonIgnore] public string Key => key ??= KeyOf(Kind, Id);
@@ -50,8 +66,12 @@ public sealed class Item {
         foreach (string kind in Holders) if (IsKind(item, kind)) return kind;
         return item[..item.IndexOf(KeyMark)];
     }
+    /// <summary>
+    /// Whether a kind is one whose units are objects only while they hold something, such as a crate.
+    /// </summary>
+    internal static bool IsHolder(string kind) => Holders.Contains(kind);
     /// <summary>Whether this object turns back into a plain unit of its kind now that it holds nothing.</summary>
-    internal bool Emptied => Contents is { Count: 0 } && Array.IndexOf(Holders, Kind) >= 0;
+    internal bool Emptied => Contents is { Count: 0 } && IsHolder(Kind);
     /// <summary>The one kind of item this object holds, the empty string when it holds several, or null when it holds nothing.</summary>
     internal string? SoleKind() {
         if (Contents is not { Count: > 0 } contents) return null;

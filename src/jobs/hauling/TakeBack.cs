@@ -63,7 +63,8 @@ internal sealed class TakeBack(World world) {
         // A mine's output shows on its page only once the mine opens.
         ThingKind.Mine => t.MineStage == MineStage.Open && (item == Mines.Ore(t) || item == "stone") ? t.Output : null,
         ThingKind.Packer => t.Packs != "" && World.PackedGood(t.Output!.Object(item)) == t.Packs ? t.Output : null,
-        ThingKind.Chest or ThingKind.Pile or ThingKind.Crate or ThingKind.Toolstation => t.Inventory.AllowsWithdrawal(item) && world.Holds(t, item, t.Inventory.Object(item)) && !World.Nests(t, item) ? t.Inventory : null,
+        ThingKind.Chest or ThingKind.Pile or ThingKind.Crate or ThingKind.Toolstation
+            => t.Inventory.Object(item) is var unit && t.Inventory.AllowsWithdrawal(item, unit) && world.Holds(t, item, unit) && !World.Nests(t, item) ? t.Inventory : null,
         _ => null
     };
 }

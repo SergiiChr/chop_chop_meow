@@ -483,7 +483,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
             string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins
-                && ContainerItem.Base(item) == item).ToArray();
+                && ChopChopMeow.Item.KindOf(item) == item).ToArray();
             float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
             Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);

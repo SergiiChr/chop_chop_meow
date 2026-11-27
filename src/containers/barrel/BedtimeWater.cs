@@ -14,23 +14,14 @@ internal sealed class BedtimeWater(World world) {
     }
 
     private static int Supply(Thing cabin) =>
-        Barrel.In(cabin.Inventory) is string item && cabin.Inventory.Free(item) > 0 ? Barrel.Liters(cabin.Inventory.Object(item)) : 0;
-
-    private static int BottleRoom(PlayerState player) {
-        var box = player.Backpack;
-        int liters = box.Free(Water.Empty) * Water.Capacity;
-        foreach (var (item, _) in box.Items) if (Water.BottleLiters(box, item) is > 0 and int held && box.Free(item) > 0) liters += Water.Capacity - held;
-        return liters;
-    }
+        Barrel.In(cabin.Inventory) is string item && cabin.Inventory.Free(item) > 0 ? Vessels.LitersIn(cabin.Inventory.Object(item)) : 0;
 
     /// <summary>The fullest water bottle in a backpack that still has room, an empty one last, or null.</summary>
-    private static string? FullestRoomyBottle(Inventory box) {
-        string? fullest = box.Free(Water.Empty) > 0 ? Water.Empty : null;
-        int most = 0;
-        foreach (var (item, _) in box.Items)
-            if (Water.BottleLiters(box, item) is > 0 and int held && held < Water.Capacity && held > most && box.Free(item) > 0) { fullest = item; most = held; }
-        return fullest;
-    }
+    private static string? FullestRoomyBottle(Inventory box) =>
+        Vessels.Roomiest(box, Water.Empty, Water.Liquid, Water.Capacity, fullest: true) ?? (box.Free(Water.Empty) > 0 ? Water.Empty : null);
+
+    /// <summary>The liters of water a backpack's bottles have room for.</summary>
+    private int BottleRoom(Inventory box) => world.VesselRoom(box, world.Data.VesselOf(Water.Empty, Water.Liquid)!);
 
     /// <summary>Projects thirst before sleep starts and on waking, using the cabin barrel's current water.</summary>
     internal (float Bedtime, float Dawn) Preview(PlayerState player, float loss, bool fillBottles = true) {
@@ -40,12 +31,12 @@ internal sealed class BedtimeWater(World world) {
         int available = Supply(cabin);
         if (available == 0) return (player.Thirst, dryDawn);
         int own = player.SleepingAt == cabin.Id ? 0 : ThirstLiters(player.Thirst);
-        int total = own + (fillBottles ? BottleRoom(player) : 0), aheadLiters = 0, aheadAtWake = 0;
+        int total = own + (fillBottles ? BottleRoom(player.Backpack) : 0), aheadLiters = 0, aheadAtWake = 0;
         foreach (var other in world.Players) {
             if (other == player || other.Sheltered != cabin.Id) continue;
             bool asleep = other.SleepingAt == cabin.Id;
             int liters = asleep ? 0 : ThirstLiters(other.Thirst);
-            if (asleep && fillBottles) total += BottleRoom(other);
+            if (asleep && fillBottles) total += BottleRoom(other.Backpack);
             if (Before(other, player)) {
                 aheadLiters += liters;
                 if (asleep) aheadAtWake += ThirstLiters(Math.Max(0, other.Thirst - loss));

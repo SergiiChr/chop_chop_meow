@@ -44,7 +44,7 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
 
     /// <summary>How many of the free units of an item a place a load goes to takes, as far as it has room; vessels that pour there go as many as its liters of room take.</summary>
     /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate.</param>
-    internal static int Takes(World world, Thing to, string item, int free, Item? unit = null) {
+    internal static int Takes(World world, Thing to, string item, int free, Item? unit) {
         if (world.Intake(to, item, false, unit) is not (Inventory into, int room)) return 0;
         if (world.PoursInto(to, into, item, unit) != null) room = (room + Vessels.LitersIn(unit) - 1) / Vessels.LitersIn(unit);
         return Math.Min(free, room);

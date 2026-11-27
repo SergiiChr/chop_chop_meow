@@ -784,8 +784,9 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt, eating: campfire.Eating);
             state.Mark = Mark(assignment, state, work);
             bool waterTool = BarrelHaul.Vessel(worker.Tool);
-            string? vessel = waterTool ? Vessels.LookOf(World.Data, worker.ToolSlot, worker.Tool) : null;
-            bool filled = Vessels.LitersIn(worker.ToolSlot.Object(worker.Tool)) > 0;
+            var toolUnit = waterTool ? worker.ToolSlot.Object(worker.Tool) : null;
+            string? vessel = waterTool ? Vessels.LookOf(World.Data, worker.Tool, toolUnit) : null;
+            bool filled = waterTool && Vessels.LitersIn(toolUnit) > 0;
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null && waterTool) {
                 var point = waterTarget.Kind switch {
@@ -807,8 +808,9 @@ public partial class WorldView : Node3D {
                 // A worker works a station with the hammer slotted there, never one of their own, so that is the one they swing.
                 string? slotted = ActorAnimation.Tool(work) == "hammer" && assignment?.Tools != null ? World.BenchTool(assignment, "hammer") : null;
                 if (work == ActorAction.Carry && worker.Bag.First() is string load && Water.IsBottle(load)) {
-                    vessel = Vessels.LookOf(World.Data, worker.Bag, load);
-                    filled = Vessels.LitersIn(worker.Bag.Object(load)) > 0;
+                    var loadUnit = worker.Bag.Object(load);
+                    vessel = Vessels.LookOf(World.Data, load, loadUnit);
+                    filled = Vessels.LitersIn(loadUnit) > 0;
                 }
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
@@ -1588,9 +1590,11 @@ public partial class WorldView : Node3D {
                     string kind = World.ToolKind(held);
                     foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
                     if (kind == Water.BottleTool) {
-                        if (held == rack.BottleItems[slot]) continue;
-                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), held);
-                        rack.BottleItems[slot] = held;
+                        // A bottle filled or drunk keeps its key, so the gauge follows its look.
+                        string shows = Vessels.LookOf(World.Data, held, layout[slot].Units?[0]);
+                        if (shows == rack.BottleLooks[slot]) continue;
+                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), shows);
+                        rack.BottleLooks[slot] = shows;
                     }
                 }
                 break;

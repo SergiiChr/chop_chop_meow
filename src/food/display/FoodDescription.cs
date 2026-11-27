@@ -6,11 +6,16 @@ namespace ChopChopMeow;
 
 /// <summary>The hunger and effects shown together on a food tooltip or in the Recipe map sidebar.</summary>
 public static class FoodDescription {
-    /// <summary>The food an item is, the liquid in a vessel from <paramref name="box"/> included, when it has effects to describe; or null.</summary>
-    public static ItemDef? Of(GameData data, string item, Inventory? box = null) =>
-        data.Items.TryGetValue(Eaten(item, box), out var def) && def.FoodEffects.Length > 0 ? def : null;
-    /// <summary>What eating an item eats: the liquid a vessel holds, such as a bottle's jam, or the item itself.</summary>
-    public static string Eaten(string item, Inventory? box) => Vessels.LiquidIn(box?.Object(item)) ?? item;
+    /// <summary>
+    /// The food an item is, the liquid a vessel's object holds included, when it has effects to describe; or null.
+    /// </summary>
+    /// <param name="unit">The object the item's key finds in its box.</param>
+    public static ItemDef? Of(GameData data, string item, Item? unit = null) =>
+        data.Items.TryGetValue(Eaten(item, unit), out var def) && def.FoodEffects.Length > 0 ? def : null;
+    /// <summary>
+    /// What eating an item eats: the liquid a vessel's object holds, such as a bottle's jam, or the item itself.
+    /// </summary>
+    public static string Eaten(string item, Item? unit) => Vessels.LiquidIn(unit) ?? item;
 
     private static string Text(string item, ItemDef food, bool bold) {
         bool perLiter = item == BerryJam.Liquid;
