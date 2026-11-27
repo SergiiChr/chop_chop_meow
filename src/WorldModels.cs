@@ -78,7 +78,9 @@ public sealed class DugProp : Prop {
 }
 
 public sealed class BushProp : Prop {
-    public Node3D Fruit = null!;
+    public MeshInstance3D Fruit = null!;
+    /// <summary>The fruit mesh for each berry stage with berries, from <see cref="WorldModels.BerryStage"/>, stage 1 first; a picked-clean bush hides its fruit.</summary>
+    public Mesh[] Stages = null!;
 }
 
 public sealed class CarcassProp : Prop {
@@ -245,8 +247,15 @@ public static class WorldModels {
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => t.Remaining / (float)World.DepositOre,
         ThingKind.WolfCorpse => t.Remaining / (float)World.WolfMeat,
         ThingKind.LeafSpot => t.Remaining / (float)World.LeavesPerSpot,
+        ThingKind.Berries => t.Remaining / (float)World.BushBerries,
         _ => 1
     };
+
+    /// <summary>How many stages a berry bush shows berries in; a picked-clean bush shows none.</summary>
+    public const int BerryStages = 4;
+
+    /// <summary>Which stage a berry bush shows, from 0 when picked clean to <see cref="BerryStages"/> when full, each stage a quarter of a full bush's berries rounded up.</summary>
+    public static int BerryStage(Thing t) => Math.Clamp((int)MathF.Ceiling(Fullness(t) * BerryStages), 0, BerryStages);
 
     /// <summary>How many looks a tree has: every species in every variant.</summary>
     public const int TreeLooks = World.TreeSpecies * NatureShape.Variants;
@@ -548,9 +557,9 @@ public static class WorldModels {
         var prop = new BushProp();
         int variant = id % NatureShape.Variants;
         var leaves = Tree3DShape.Add(prop.Body, Tree3DShape.Bush, variant);
-        var fruit = Pivot(prop.Body, Vector3.Zero);
-        Add(fruit, NatureShape.CardBerries(leaves, variant), NatureShape.Glossy, Vector3.Zero);
-        prop.Fruit = fruit;
+        prop.Stages = new Mesh[BerryStages];
+        for (int stage = 1; stage <= BerryStages; stage++) prop.Stages[stage - 1] = NatureShape.CardBerries(leaves, variant, stage * NatureShape.BerryClusters / BerryStages);
+        prop.Fruit = Add(prop.Body, prop.Stages[BerryStages - 1], NatureShape.Glossy, Vector3.Zero);
         return prop;
     }
 
