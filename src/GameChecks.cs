@@ -1160,6 +1160,8 @@ public partial class Game {
             await RunFirebugUIChecks();
             await RunLakeUIChecks();
             await RunDiaryUIChecks();
+            await RunLanternUIChecks();
+            await RunDebugChestUIChecks();
             await RunBuildingRemovalUIChecks();
             await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);

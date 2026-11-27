@@ -28,6 +28,7 @@ public static class Style {
     /// <summary>On a dark popup: something there and ready, and something the player has that is not where it works for everyone.</summary>
     public static readonly Color Ready = new("8fcf9a"), Held = new("e8c468");
     public static readonly Color Rise = new("4f7a55");
+    public static readonly Color FirebugGreen = new("adff76");
     /// <summary>Modulates: a faint picture of what an empty slot wants, something not ready yet, and what the open page does not take.</summary>
     public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
 
@@ -86,6 +87,7 @@ public static class Style {
     public static readonly StyleBoxFlat PlateNormal = Flat(SlotFill, 16, 6, Line, 2), PlateHover = Flat(SlotFill, 16, 6, Mustard, 3), PlateKept = Flat(SlotFill, 16, 6, Brick, 6), PlateSelected = Flat(SlotFill, 16, 6, Brick, 3);
     /// <summary>The pill on a slot's corner that counts what it holds.</summary>
     public static readonly StyleBoxFlat CountPill = Flat(Line, 9, 0, Rim, 2, horizontal: 5);
+    public static readonly StyleBoxFlat FirebugCountPill = Flat(new Color("234232"), 9, 0, FirebugGreen, 2, horizontal: 5);
     /// <summary>The count beside a job's name, and a menu badge's key.</summary>
     public static readonly StyleBoxFlat BeigePill = Flat(Beige, 12, 0, horizontal: 6);
     public static readonly StyleBoxFlat KeyPill = Flat(Beige, 9, 0, Line, 2, horizontal: 5);

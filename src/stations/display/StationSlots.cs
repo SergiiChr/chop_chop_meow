@@ -18,11 +18,18 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
         moves.TakeCell(cell, box, item, t, takes, put);
-        // Redrawn only when the amount held changes.
-        live.Watch(() => box[item], held => {
-            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = $"{tooltip(held)}\n{RecipeMap.AltClickHint}";
+        // Redrawn only when the amount held or the firebugs' count or time left changes.
+        bool lantern = Lanterns.IsItem(item);
+        live.Watch(() => {
+            int held = box[item];
+            int life = item == Firebugs.Item && held > 0 ? world.Firebugs.AverageMinutes(box) : -1;
+            int bugs = lantern && held > 0 ? world.Lanterns.BugCount(item) : -1;
+            return (Held: held, Life: life, Bugs: bugs);
+        }, shown => {
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
+            count.SetStack(shown.Held, shown.Bugs);
+            string hint = tooltip(shown.Held);
+            cell.TooltipText = $"{hint}{PageText.FirebugLifeLine(shown.Life)}\n{RecipeMap.AltClickHint}";
         });
         return cell;
     }
@@ -56,7 +63,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     public int RateCode() => world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) ? (int)MathF.Round(Rate(recipe) * 100) : 0;
 
     /// <summary>Whether an item a station holds is neither an input nor the product of a recipe.</summary>
-    private static bool Leftover(RecipeDef recipe, string item) => !recipe.Inputs.ContainsKey(item) && item != recipe.Output;
+    private static bool Leftover(RecipeDef recipe, string item) => !recipe.Inputs.ContainsKey(item) && !World.IsProduct(recipe.Output, item);
 
     /// <summary>A number that changes with which leftovers the station holds beside its recipe's inputs and product, built without allocating.</summary>
     public int SideCode() {
@@ -84,7 +91,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             bool burnable = recipe.Fuels.Contains(fuel);
             cell.Icon = Icons.Of(fuel);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 && burnable ? Colors.White : held > 0 ? Style.Brick : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
+            count.SetStack(held, -1);
             string hint = held > 0 && !burnable
                 ? $"Fuel · {world.Data.Name(fuel)} · {held}\n{recipe.Name} cannot burn it · take it out and load {burns}"
                 : $"Fuel · {(held > 0 ? world.Data.Name(fuel) : "empty")} · {held}/{burner.StackOf(fuel)}\nOne burns per batch · put {burns} here";
@@ -102,6 +109,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     /// The output slot of the recipe the station is on takes back what that recipe makes, and side slots take nothing.
     /// </summary>
     public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
+        if (item == Lanterns.Item) return LanternSlot(input, perBatch, size);
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
         bool product = !input && world.Product(t) == item;
@@ -114,6 +122,28 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         // The product goes back as into storage; an input loads through the station's own rules.
         var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}{(vessel == null ? "" : " L")}\n{hint}", size, takes: takes,
             put: product ? null : (held, units) => world.LoadInput(t, held, units));
+        return Labelled(cell, perBatch);
+    }
+
+    /// <summary>Shows lanterns together but takes one at a time, keeping the charge of each lantern.</summary>
+    private VBoxContainer LanternSlot(bool input, string perBatch, float size) {
+        var box = t.Inventory;
+        var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{Lanterns.Item}", size);
+        var firebugs = ItemSlot.CountBadge(1, 0);
+        firebugs.Name = "firebug_count";
+        cell.AddChild(firebugs);
+        cell.Icon = Icons.Of(Lanterns.Item);
+        if (!input) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
+        moves.TakeCell(cell, box, () => box.FirstLantern(), t,
+            held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
+            input ? (item, units) => world.LoadInput(t, item, units) : null);
+        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
+            count.SetStack(now.Count, -1);
+            firebugs.SetStack(0, now.Bugs);
+            string name = world.Lanterns.Name(now.Bugs);
+            cell.TooltipText = $"{name} · {now.Count}{world.Data.DescriptionLine(Lanterns.Item)}\n{SlotHint}";
+        });
         return Labelled(cell, perBatch);
     }
 }

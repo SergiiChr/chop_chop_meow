@@ -35,6 +35,9 @@ public static class SimulationChecks {
         NettleRopeChecks.Run(data);
         FirebugChecks.Run(data);
         DiaryChecks.Run(data);
+        LanternChecks.Run(data);
+        LanternCraftChecks.Run(data);
+        LanternModelChecks.Run(data);
         SandChecks.Run(data);
         GlassJarChecks.Run(data);
         CraftingChecks.Run(data);
@@ -72,6 +75,7 @@ public static class SimulationChecks {
         CrateChecks.Run(data);
         ToolStationChecks.Run(data);
         PileChecks.Run(data);
+        DebugChestChecks.Run(data);
         FarmChecks.Run(data);
         TradeChecks.Run(data);
         GoalChecks.Run(data);

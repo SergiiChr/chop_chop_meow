@@ -10,7 +10,7 @@ public abstract record ClickMode {
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
-    /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
+    /// <summary>A click places a crate, barrel or lantern, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
     /// <summary>Holding right mouse on open ground digs a hole.</summary>
     public sealed record Dig : ClickMode;
@@ -24,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : Lanterns.IsItem(container.Item) ? ThingKind.Lantern : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -107,7 +107,7 @@ public sealed class PlayerControl {
     /// <summary>Enters placement for a container from the backpack.</summary>
     public void PlaceContainer(string item, int backpackSlot = -1) {
         var container = new ClickMode.Container(item, backpackSlot);
-        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : "No empty crate in your backpack."); return; }
+        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : Lanterns.IsItem(item) ? "No lantern in your backpack." : "No empty crate in your backpack."); return; }
         Mode = container; panel.Close();
     }
 
@@ -156,7 +156,7 @@ public sealed class PlayerControl {
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
     private void PlaceHeld(bool overPanel) {
         var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
-        string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item)) ? held.Item : null;
+        string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item) || Lanterns.IsItem(held.Item)) ? held.Item : null;
         var previous = heldPlacement;
         // Built only when it changes, as this runs every frame.
         if (plan is ThingKind kind) {
@@ -344,6 +344,7 @@ public sealed class PlayerControl {
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         if (Layer == Layer.Underground) return;
         var t = view.Pick(at);
+        if (t is { Kind: ThingKind.Lantern }) { gathering = null; lifting = null; panel.Select(t); return; }
         // With a bug net selected a right click on a firebug swings at it, as one on open ground swings toward the pointer.
         if (t is { Kind: ThingKind.Firebug } && Mode is ClickMode.Normal && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") {
             gathering = null; lifting = null;
@@ -455,7 +456,9 @@ public sealed class PlayerControl {
     private void PlaceContainerAt(ClickMode.Container container, Vector2 at) {
         string item = container.Item;
         void Put() {
-            if (Barrel.Is(item)) world.PlaceBarrel(item, at, container.Rotation); else world.PlaceCrate(item, at, container.Rotation);
+            if (Barrel.Is(item)) world.PlaceBarrel(item, at, container.Rotation);
+            else if (Lanterns.IsItem(item)) world.Lanterns.Place(item, at, container.Rotation);
+            else world.PlaceCrate(item, at, container.Rotation);
         }
         if (placingHeld && cursor.Stack?.Item == item) world.FromHeldStack(Put);
         else if (container.BackpackSlot >= 0) hotbar.FromStack(container.BackpackSlot, Put);

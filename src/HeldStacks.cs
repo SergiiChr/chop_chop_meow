@@ -90,7 +90,7 @@ public sealed partial class World {
         box.PreferredSlot = at; heldSource = box;
         heldCount = units;
         // A count that is a number of units is no more than the held stack; others, such as a hotbar slot's number, stay as they are.
-        var run = c with { Count = c.Verb is Verb.SetHotbar or Verb.PlaceCrate or Verb.PlaceBarrel or Verb.SlotTool ? c.Count : Math.Clamp(c.Count, 1, units), Held = false };
+        var run = c with { At = c.Verb == Verb.RefillLantern ? new Godot.Vector2(at, 0) : c.At, Count = c.Verb is Verb.SetHotbar or Verb.PlaceCrate or Verb.PlaceBarrel or Verb.PlaceLantern or Verb.SlotTool ? c.Count : Math.Clamp(c.Count, 1, units), Held = false };
         try { Dispatch(run); } finally { box.PreferredSlot = -1; heldSource = null; }
         // A swap moves the slot itself, and the stack it took the place of is not held.
         bool stayed = cell.Item == item && box.Layout.IndexOf(cell) == at;
@@ -102,9 +102,9 @@ public sealed partial class World {
     private static int? HeldSource(Command c, int held) => c.Verb switch {
         Verb.Transfer or Verb.TransferSlot => c.Target,
         Verb.MoveInCrate => c.Other != 0 ? 0 : CrateCode - c.Target,
-        Verb.LoadFuel or Verb.LoadInput or Verb.SupplyMine or Verb.SlotTool => 0,
+        Verb.LoadFuel or Verb.LoadInput or Verb.SupplyMine or Verb.SlotTool or Verb.RefillLantern => 0,
         Verb.MoveInBarrel when c.Other != 0 => 0,
-        Verb.PlaceCrate or Verb.PlaceBarrel or Verb.SetHotbar => held,
+        Verb.PlaceCrate or Verb.PlaceBarrel or Verb.PlaceLantern or Verb.SetHotbar => held,
         _ => null
     };
 
