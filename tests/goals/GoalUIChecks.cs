@@ -7,10 +7,14 @@ using static WorldSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>Checks goal discovery in a fresh game, then completion and the ending after the other progression checks.</summary>
-    private Task RunGoalUIChecks(bool freshGame) => freshGame
-        ? TestClean(CheckFreshGoalLogHidesUnknownGoalsAndLinksItems)
-        : TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
+    /// <summary>Checks goal discovery and its popups in a fresh game, then completion and the ending after the other progression checks.</summary>
+    private async Task RunGoalUIChecks(bool freshGame) {
+        if (!freshGame) { await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce); return; }
+        await TestClean(CheckFreshGoalLogHidesUnknownGoalsAndLinksItems);
+        await TestClean(CheckReachedGoalsPopUpInTurnAndOpenTheirDetails);
+        await TestClean(CheckGoalRevealedAlreadyDonePopsUpOnlyAsCompleted);
+        await TestClean(CheckLeavingAGameDropsItsWaitingPopups);
+    }
 
     private async Task CheckFreshGoalLogHidesUnknownGoalsAndLinksItems() {
         await KeyStroke(Key.Escape);
@@ -41,6 +45,66 @@ public partial class Game {
         Require(!recipeMap.Visible && menu.GoalDetails.Visible && view.Paused, "Closing the map should return to the paused goal details.");
         await KeyStroke(Key.Escape);
         await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>
+    /// Reaching the bench pops up "A start" as completed, then "Road to riches" as new, each with its sound, in the middle
+    /// of the screen.
+    /// A click on the popup puts the remove selector away and opens the goal over the open page.
+    /// </summary>
+    private async Task CheckReachedGoalsPopUpInTurnAndOpenTheirDetails() {
+        Require(!goalPopup.Visible, "A new game must pop up none of the goals it starts with.");
+        int before = sounds.Played;
+        Achieve(Hosted, "bench");
+        await Until(() => goalPopup.Visible && goalPopup.Title == "A start", "the bench's goal popping up", 2);
+        Require(goalPopup.Heading == "Goal completed", $"A goal reached must pop up as completed, not as \"{goalPopup.Heading}\".");
+        Require(sounds.Heard("goal_completed", before), "A completed goal's popup must play its sound.");
+        Require(!sounds.Heard("goal_new", before), "The goal the bench reveals must wait until the completed one has gone.");
+        await Until(() => goalPopup.Title == "Road to riches", "the goal the bench reveals popping up next", 7);
+        Require(goalPopup.Heading == "New goal", $"A revealed goal must pop up as new, not as \"{goalPopup.Heading}\".");
+        Require(sounds.Heard("goal_new", before), "A new goal's popup must play its sound.");
+        Require(Mathf.Abs(goalPopup.GetGlobalRect().GetCenter().X - ui.Size.X / 2) < 1, "The popup must sit in the middle of the screen.");
+        await KeyStroke(Key.B);
+        await Click(Named("remove")!);
+        await KeyStroke(Key.H);
+        Require(player.Mode is ClickMode.Remove && panel.Visible, "The remove selector must be on with the crew page open.");
+        await Click(goalPopup);
+        Require(menu.Visible && menu.GoalDetails.Visible && HasLabel(menu.GoalDetails, "Build a trading post and sell a crate of goods."),
+            "Clicking the popup must open the pause menu on that goal's details.");
+        Require(player.Mode is ClickMode.Normal && panel.Visible, "Clicking the popup must put the remove selector away and leave the crew page open under the goal.");
+        await KeyStroke(Key.Escape);
+        await KeyStroke(Key.Escape);
+        Require(!menu.Visible && panel.Visible, "Escape must close the goal's details and then the pause menu, back to the crew page.");
+        await CloseWithEsc();
+        // No input skips a popup: this drops the ones the check set off, so their chimes and bars stay out of later checks.
+        goalPopup.SkipKnownGoals();
+    }
+
+    /// <summary>Seeing ore with the steel hammer and pickaxe already bought pops up "Steel tools" once, as completed only.</summary>
+    private async Task CheckGoalRevealedAlreadyDonePopsUpOnlyAsCompleted() {
+        int before = sounds.Played;
+        Achieve(Hosted, "steel_hammer", "steel_pick", Goals.OreSeen);
+        await Until(() => goalPopup.Visible && goalPopup.Title == "Steel tools", "the steel tools goal popping up", 2);
+        Require(goalPopup.Heading == "Goal completed", $"A goal revealed already done must pop up as completed, not as \"{goalPopup.Heading}\".");
+        Require(!sounds.Heard("goal_new", before), "A goal revealed already done must not pop up as new as well.");
+        // No input skips a popup: this drops the ones the check set off, so their chimes and bars stay out of later checks.
+        goalPopup.SkipKnownGoals();
+    }
+
+    /// <summary>A game left for the start menu drops the popups it still had waiting: none shows or chimes over the menu.</summary>
+    private async Task CheckLeavingAGameDropsItsWaitingPopups() {
+        Achieve(Hosted, "furnace");
+        await Until(() => goalPopup.Visible && goalPopup.Title == "Stone and embers", "the furnace's goal popping up, with the goal it reveals waiting", 2);
+        int shown = goalPopup.Shown;
+        // A host leaves for the start menu only when its server stops or its line drops: no input does it.
+        ShowStart();
+        // Longer than the popup's own refresh, so a popup left waiting would have started.
+        await Seconds(.5);
+        Require(startMenu.Visible && !goalPopup.Visible && goalPopup.Shown == shown,
+            $"Leaving a game must drop the popups it still had waiting, not show \"{goalPopup.Heading} {goalPopup.Title}\".");
+        await Click(FindButton(startMenu.Screen, "New game")!);
+        await Until(() => world.Remote && !startMenu.Visible, "the new game's server taking this window's player", 30);
+        await CloseWithEsc();
     }
 
     /// <summary>Building the mines and meeting the profit target shows the ending once, with a choice to keep playing.</summary>
@@ -79,5 +143,7 @@ public partial class Game {
         await Frames(3);
         Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
         RemoveThings(Hosted, t => t.Kind == ThingKind.Mine);
+        // No input skips a popup: this drops the ones the check set off, so their chimes and bars stay out of later checks.
+        goalPopup.SkipKnownGoals();
     }
 }

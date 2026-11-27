@@ -76,7 +76,8 @@ public partial class GoalLog : VBoxContainer {
         disclosure.Text = completed.Visible ? "▾  Completed" : "▸  Completed";
     }
 
-    private void ShowDetails(Goal goal) {
+    /// <summary>Opens the window with a goal's details over the log.</summary>
+    public void ShowDetails(Goal goal) {
         detailTitle.Text = goal.Title;
         Clear(detailItems);
         foreach (string item in goal.Items) {
