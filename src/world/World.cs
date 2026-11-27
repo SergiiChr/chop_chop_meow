@@ -452,7 +452,8 @@ public sealed partial class World {
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
     /// <summary>
-    /// Which recipe map entries the settlement has made, has been shown by a station or a goal, or has yet to discover.
+    /// Which recipe map entries the settlement has made, the player can see but nobody has made, or are still to
+    /// discover.
     /// </summary>
     public MapDiscovery MapDiscovery { get; }
     /// <summary>What idle workers play when they sit together at a campfire.</summary>
