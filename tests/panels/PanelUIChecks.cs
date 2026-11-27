@@ -39,7 +39,7 @@ public partial class Game {
         var worker = AddWorker(Hosted, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
         Hosted.Assign(worker, forge); worker.Bag.Add("coal", 2);
         var pages = new (string Name, Action Open)[] {
-            ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)),
+            ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)), ("diary", () => panel.Open(Page.Diary)),
             ("chest", () => panel.Select(Shown(chest))), ("pile", () => panel.Select(Shown(pile))), ("bellows furnace", () => panel.Select(Shown(forge))), ("furnace", () => panel.Select(Shown(furnace))),
             ("campfire", () => panel.Select(Shown(fire))), ("cabin", () => panel.Select(Shown(hut))), ("signpost", () => panel.Select(Shown(sign))), ("farm", () => panel.Select(Shown(farm))), ("packing station", () => panel.Select(Shown(packer))),
             ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(world.Workers.First(w => w.Id == worker.Id))),

@@ -130,6 +130,8 @@ Simulation and data:
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
+| `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
+| `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -170,6 +172,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -1090,8 +1093,8 @@ A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
 A nettle blocks building like a berry bush.
-A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
-stays, grass grows under it and the ground takes no contact shade.
+A firebug takes no ground (`Thing.TakesGround`): buildings, yards, gravel paths, holes and nettles go where one hovers,
+it stays, grass grows under it and the ground takes no contact shade.
 A right click with the shovel out goes through a firebug to the ground under it (`PlayerControl.RightPress`).
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
@@ -1102,6 +1105,82 @@ It bobs about `FirebugShape.Height` and follows the world's position no faster t
 updates never show.
 
 `ItemDef.Description` is what the player says of an item; `GameData.DescriptionLine` gives it as a tooltip line.
+
+### Diary
+
+`Diary` (`src/diary/model/Diary.cs`) keeps each player's diary in their `PlayerState`: `DiaryFinds`, the finds taken;
+`DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
+for them.
+No thing's id is given out twice, so once that page is picked up or cleared away, `FallenPage` names nothing and needs no
+reset.
+`DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
+drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
+pop-up and the days it holds.
+`GameData` checks that every day is in exactly one find.
+`DiaryFind.Book`, the diary itself, and `DiaryFind.Ashes`, the page in a cave's ashes, wait for the caves: nothing gives
+them out yet.
+
+- **Lake.** A new game floats one `ThingKind.FloatingPage` on the shore at a seeded spot (`Diary.Float`).
+  Where it is now is `Diary.FloatAt`, a slow drift by the world's clock along the shore and `Diary.FloatsFrom` to
+  `Diary.FloatsTo` metres in from it, so the host and every window agree on it without an update.
+  It stays for the others when one player takes it.
+- **Chance.** Each of a player's own gathers of a tree, a berry bush or a leaf spot (`World.Gather`), and each square
+  of beach sand they dig (`Beach.Strip`), rolls `Diary.FindChance` for the find it hides (`Diary.Roll`) until the
+  player has it; a worker's gathering never does.
+  A tree's page lands as a `ThingKind.FallenPage` on ground to stand on `Diary.FallNear` to `Diary.FallFar` from the
+  trunk, for the chopper alone; any other find comes up in its pop-up at once.
+  The rolls are seeded and start again with each world.
+  `Diary.Quiet` stops them: `WorldSteps.EmptyWorld` and the check session set it, since a pop-up stops its player and a
+  check that gathers would stop with it.
+
+`Diary.ShowsTo` says who sees a page lying in the world: the lake's to every player who has neither taken it nor has its
+pop-up up, and a fallen one to the player whose `FallenPage` it is.
+`World.CollectKnown`, which drawing and picking go through, leaves out the pages hidden from the window's player.
+A page leaves no memory under fog, is not one of `World.Structures`, and takes no ground (`Thing.TakesGround`): grass
+grows under it and its coming and going leaves the ground dressing alone.
+A fallen page keeps its place while its player is away, and they find it there when they come back.
+A building, yard or crate put over it clears it away with the stumps and bushes under it (`World.ClearGround`), so a
+later chop can drop their page again.
+A save is refused when a player's `FallenPage` is an id not given out yet, names a thing that is not such a page, or
+names one while they have its find already (`Diary.Valid`).
+A left or a right click on a page walks the player over to it, as to a loose piece (`Thing.TakenWhole`), and
+`Verb.PickUp` brings up its pop-up (`Diary.PickUp`); a fallen page leaves the ground then.
+`World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
+
+`FindPrompt` shows the find's line and a Take button alone; Esc leaves it up.
+Take (`Verb.TakePage`) turns a page, puts the find in the diary, and opens the `ReadingSheet` on the find's first day,
+with the Diary left closed.
+`Hotbar.StampDiaryOnFirstFind` holds back the diary's badge, which shows once the player has a find, while the day the
+first find opened is open, and stamps it into the row as that day closes, so the stamp shows where the Diary is kept: it
+drops in large, tilted and faint, and settles with a small bounce.
+The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
+`DiaryPanel` lays out a `DiaryCell` for each day in order, four to a row: a torn scrap with the page's icon on it.
+A found day is bright, with its place in the diary in black over the icon and a brick edge while it is not read.
+A day not found is greyed out, sheet and icon, with a faint question mark.
+`ReadingSheet` writes the day in Caveat on a white sheet in the page model's proportions (`PageShape.Tallness`), with
+the scribble glyphs in place of what cannot be read.
+From `DiaryDay.FallsApart` to the paragraph's end, `FallingApart` moves each letter further off the line than the last,
+as if written in the dark.
+Opening a day sends `Verb.ReadDiary`, which a guest sends whatever its copy says: the day a find just taken
+opens on reaches the guest's copy only with a later update.
+The goal **A success story** (`GoalId.Diary`) reads the window's own player (`World.Me`), so each player sees their
+own count, and completes with all 11 days.
+
+`PageShape` draws a page as one cupped sheet with rows of ink.
+On the lake it bobs and turns at the water's level where `Diary.FloatAt` has it.
+A fallen page that appears in front of its player comes down from 3.2 m over `PageShape.FallSeconds`, swinging from
+side to side less and less and tipping into each swing, to land flat where it lies, and rustles as it starts.
+
+The lake's shallows can be waded: `Terrain.Open` counts ground up to `Terrain.Wade` metres in from the shore, so
+players, workers and wolves walk there, and their feet go down to the lake's bed (`Terrain.BedDepth`).
+`WorldView.StandsAt` places every body on it, standing, knocked down, pinning or feeding, and a wolf sets each paw on
+the bed under it.
+Loose pieces and pages can land there: `WorldView` draws everything lying in the shallows on the lake's bed, except a
+page, which floats, a firebug, which flies, and a pump, whose intake is built into the water.
+Building keeps out of them: a building's middle keeps `Construction.ShoreRoom` back from the shore, so a large one's
+footprint may still reach over the shallows, and the spots it is worked
+from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's ladder, a furnace's glass blower
+and bellows spots and a packing table's packer spot.
 
 ### Tools
 

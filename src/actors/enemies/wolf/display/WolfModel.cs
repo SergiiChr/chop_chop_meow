@@ -1022,8 +1022,9 @@ public sealed class WolfModel {
             var frame = PawFrame(half.At, pose.Leg(leg), leg);
             // The paw bone as placed in the world.
             var placed = root * frame;
-            float lowest = Lowest(placed);
             var toes = placed * SoleOutline[ToePoint];
+            // How high the paw is over the ground under it: the lake bed while wading in its shallows.
+            float ground = WorldView.StandsAt(new Vector2(toes.X, toes.Z)).Y, lowest = Lowest(placed) - ground;
             bool down = lowest < DownBy;
             // Where the paw bone goes, moved from where the pose has it.
             Vector3 shift;
@@ -1051,7 +1052,7 @@ public sealed class WolfModel {
                         // It lifts clear of the ground on its way, as high as it has to go, rather than dragging along it.
                         shift = parted[leg] * left + Vector3.Up * (steps ? StepLift : Math.Min(StepLift, parted[leg].Length())) * MathF.Sin(MathF.PI * since[leg]);
                         // A paw on its way down lands where it has come to, once it is there.
-                        if (down && (!steps || since[leg] >= 1) && Lowest(Shifted(placed, root, shift)) < DownBy) {
+                        if (down && (!steps || since[leg] >= 1) && Lowest(Shifted(placed, root, shift)) - ground < DownBy) {
                             contacts[leg] = PawContact.Down; anchor[leg] = (toes + root.Basis * shift) with { Y = 0 };
                             if (steps) stepping = false;
                             shift = toModel.Basis * HeldShift(leg, toes, lowest);
@@ -1060,7 +1061,7 @@ public sealed class WolfModel {
                     }
             }
             // Nothing goes into the ground.
-            float under = Lowest(Shifted(placed, root, shift));
+            float under = Lowest(Shifted(placed, root, shift)) - ground;
             if (under < 0) shift += toModel.Basis * Vector3.Up * -under;
             if (shift.LengthSquared() < Hair * Hair) continue;
             var (lower, paw) = Slant(half, pose.Leg(leg));

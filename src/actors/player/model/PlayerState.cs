@@ -63,6 +63,17 @@ public sealed class PlayerState {
     public bool DoorRush { get; set; }
     /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those tugged back out goes in first.</summary>
     public int DoorQueued { get; set; }
+    /// <summary>The parts of the diary this player has taken, in the order taken.</summary>
+    public List<DiaryFind> DiaryFinds { get; set; } = new();
+    /// <summary>The numbers of the diary days this player has opened to read.</summary>
+    public List<int> DiaryRead { get; set; } = new();
+    /// <summary>The find whose pop-up waits for this player to take it, or none; until they do, they are busy.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public DiaryFind DiaryFinding { get; set; }
+    /// <summary>
+    /// The page that fell off a tree for this player, or zero.
+    /// Once it is picked up or cleared away, the id names nothing, since no id is used twice.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FallenPage { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
     /// <summary>A nettle or anything else that stings took health from the player while they picked it this tick; carried so every machine hears them groan.</summary>
