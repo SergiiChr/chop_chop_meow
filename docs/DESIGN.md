@@ -228,7 +228,7 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
-| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges under the needs plate |
+| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges beside the Layer switch |
 | `src/food/display/FoodDescription.cs` | Hunger and food effects in item tooltips and the Recipe map sidebar |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
@@ -272,7 +272,7 @@ UI and input:
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
 | `src/actors/player/InteractionApproach.cs` | The player's cancellable walk to a selected thing before using it once |
 | `src/actors/player/WalkKeys.cs` | The movement keys and Shift held by code that plays the player: the performance run and the firebug chase |
-| `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
+| `src/ui/Hotbar.cs` | The tool belt: illustrated menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
 
@@ -1823,6 +1823,7 @@ Dawn wages, settled strikes and hiring payments draw on every wage slot before t
 
 #### Price sheet
 
+The price sheet stays open beside the trading post while the player ships, hires or edits filters.
 The price sheet shows `SaveState.Prices`, a snapshot of sale prices.
 It is taken when a cart returns, or when a worker on the trading post's deliveries job comes back from a price errand (`Worker.Away`).
 Trades always use the live price, so the sheet can be out of date.

@@ -237,7 +237,8 @@ Health, hunger and thirst are three upright vials in the top-left corner with a 
 Each empties as its level falls and turns red at 25% or less.
 Bonus health continues the health bar in a brighter color. Only the part past 100% wraps to the bottom for a second lap.
 Hunger over 100% also wraps to a brighter second lap.
-Active food effects appear in a row below the plate. Hover an effect to see what it does and how long it has left.
+Active food effects appear as colored round badges to the right of the Layer switch, below the status bar.
+Hover an effect to see what it does and how long it has left.
 
 Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
 Under the wages it shows the coins sales brought in since dawn, green once they are above a day's wages and red until then.
@@ -255,8 +256,8 @@ With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
-The bottom bar holds round badges for building, the backpack, crafting, the recipe map and the crew next to the hotbar.
-Once you find part of the diary, a diary badge is stamped into the row after the crew's ([Diary](#diary)).
+Rounded-square badges for Build, Backpack, Crafting, Recipe map and Crew sit next to the hotbar.
+Once you find part of the diary, the Diary badge is stamped into the row after Crew ([Diary](#diary)).
 
 Put a held stack or a plan from the building plans on a hotbar slot to assign it.
 A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
@@ -1142,7 +1143,8 @@ Wheat seeds and fertilizer can also be bought from the village.
 
 ## Trading post
 
-The trading post has three icon buttons: Market, Workers and the price sheet.
+The trading post has two tabs for Market and Workers, with the price sheet always visible beside them.
+The tabs and Filters share a slate-blue background, active controls have a gold rim, and the red X closes the window.
 
 ### Market
 
@@ -1157,10 +1159,11 @@ Anything else in a crate goes as a donation: the cart takes it and pays nothing 
 The returning cart says what was donated.
 A crate whose firebugs have all died stays in the market as an empty crate, and the next cart takes it as a donation too.
 A sale pays for the goods and the crate.
-Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
+Load crates and press Sell goods. A cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
 
-The filter button next to close names the crates workers bring here; with none named, workers bring nothing.
+The Filters button opens the list of crates workers bring here without hiding the price sheet.
+With no crates named, workers bring nothing.
 Tick Send when full and the cart leaves on its own once all six boxes hold a crate.
 
 Trade carts keep their timing: a cart walks down the valley at a steady pace, fades out once it is well along, and waits out of view before walking back.
@@ -1176,7 +1179,7 @@ The slot only holds coins, and you can move coins in or out by hand.
 
 ### Price sheet
 
-The price sheet opens to the left of the panel and lists sell and buy prices with a Buy button for what the village sells:
+The price sheet stays open to the left of the trading post and lists sell and buy prices with a Buy button for what the village sells:
 
 | Goods | Sold by |
 | --- | --- |
@@ -1200,7 +1203,7 @@ Buying costs a fixed 1.25× the base price, so a buy-and-resell loop never profi
 
 ## Workers
 
-The Workers tab at the trading post offers several hiring deals: more coins up front means a lower daily wage.
+The Workers tab at the trading post offers several hiring deals: a larger downpayment means a lower daily wage.
 Workers are individual entities with assignments, wages, cargo and visible work status.
 There are at most forty workers.
 

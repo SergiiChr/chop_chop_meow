@@ -116,7 +116,11 @@ public static class Style {
     public static readonly Color[] JobColors = { Brick, Sage, new("b08a45"), new("5f8aa6") };
     /// <summary>Round buttons in a panel's header: close in brick, an action in sage, filters in beige.</summary>
     public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) CloseRound = Round(Brick, 18), ActionRound = Round(Sage, 18), FilterRound = Round(Beige, 18);
-    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) TabRound = Round(Line, 24), TabActive = Round(Brick, 24);
+    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) TabRound = Round(Line, 24);
+    private static readonly Color SlateTabFill = Sky.Darkened(.34f);
+    /// <summary>Slate tabs keep their fill and show selection with a mustard rim.</summary>
+    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) SlateTab = Round(SlateTabFill, 24);
+    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) SlateTabSelected = (Flat(SlateTabFill, 24, 0, Mustard, 3), SlateTab.Hover);
 
     /// <summary>A stage on a track: done, the current one, and still to come.</summary>
     public static readonly StyleBoxFlat StageDone = Round(Sage, 24).Item1, StageNow = Round(Mustard, 24).Item1, StageTodo = Round(Line, 24).Item1;

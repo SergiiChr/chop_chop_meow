@@ -11,8 +11,8 @@ public sealed class PageMemory {
     public bool PackPicking;
     /// <summary>The recipe groups the player has closed, on every recipe board.</summary>
     public readonly HashSet<RecipeGroup> ClosedGroups = new();
-    /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
-    public bool Hiring, SheetOpen = true;
+    /// <summary>Whether the trading post shows hiring rather than shipping.</summary>
+    public bool Hiring;
     /// <summary>The number of the packed crate opened from the backpack, or 0 for an empty crate.</summary>
     public int CarriedCrate;
     /// <summary>The backpack cell of the open steel barrel.</summary>

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c2rf2xx8vqgud"
-path="res://.godot/imported/line_craft.svg-cba99f91c5ed41e0ed4383931abb8b32.ctex"
+uid="uid://bkk25bn6wi1dp"
+path="res://.godot/imported/menu_crew.svg-8cbd66e475a10eac0bd731b6c4fb76f7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/line_craft.svg"
-dest_files=["res://.godot/imported/line_craft.svg-cba99f91c5ed41e0ed4383931abb8b32.ctex"]
+source_file="res://assets/ui/menu_crew.svg"
+dest_files=["res://.godot/imported/menu_crew.svg-8cbd66e475a10eac0bd731b6c4fb76f7.ctex"]
 
 [params]
 

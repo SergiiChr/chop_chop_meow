@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://rjdmw66owcwm"
-path="res://.godot/imported/line_build.svg-1995c159953c26b2605f0e0654c1d7ea.ctex"
+uid="uid://c5yg3fhjnh6yn"
+path="res://.godot/imported/hardhat_illustration.svg-bb98b42d03946a29338a655596223e84.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/line_build.svg"
-dest_files=["res://.godot/imported/line_build.svg-1995c159953c26b2605f0e0654c1d7ea.ctex"]
+source_file="res://assets/ui/hardhat_illustration.svg"
+dest_files=["res://.godot/imported/hardhat_illustration.svg-bb98b42d03946a29338a655596223e84.ctex"]
 
 [params]
 

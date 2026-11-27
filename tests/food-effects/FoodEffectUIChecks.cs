@@ -10,7 +10,7 @@ public partial class Game {
         await TestClean(JamShowsAtMostOneFullHungerBar);
         await TestClean(CookingOutputShowsWhatTheFoodRestores);
         await TestClean(AJamBarrelShowsWhatItsJamRestores);
-        await TestClean(EatingStewShowsItsEffectsBelowTheNeedsPlate);
+        await TestClean(EatingStewShowsItsEffectsBesideTheLayerSwitch);
     }
 
     private async Task JamShowsAtMostOneFullHungerBar() {
@@ -65,7 +65,8 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task EatingStewShowsItsEffectsBelowTheNeedsPlate() {
+    private async Task EatingStewShowsItsEffectsBesideTheLayerSwitch() {
+        var layerPosition = layerButton.GetGlobalRect().Position;
         var (hunger, thirst, health) = (Hosted.Hunger, Hosted.Thirst, Hosted.Health);
         SetNeeds(Hosted, thirst: 100);
         Give(Hosted, "meat_stew");
@@ -89,8 +90,16 @@ public partial class Game {
         var fed = foodEffectRow.GetNode<FoodEffectBadge>("WellFed");
         await Until(() => foodEffectRow.Visible && recovery.Visible && fed.Visible && needsPlate.Hunger.Level > 149,
             "the stew's two badges and the hunger second lap appearing together", 3);
-        Require(foodEffectRow.GetRect().Position.Y > needsPlate.GetRect().End.Y
-            && fed.Position.X > recovery.Position.X && fed.Position.Y == recovery.Position.Y, "the badges should form one row below the needs plate");
+        var layerBounds = layerButton.GetGlobalRect();
+        var recoveryBounds = recovery.GetGlobalRect();
+        var fedBounds = fed.GetGlobalRect();
+        Require(layerBounds.Position == layerPosition && layerBounds.Position.Y > needsPlate.GetGlobalRect().End.Y,
+            "the Layer switch should stay below the needs plate when food effects appear");
+        Require(recoveryBounds.Position.Y == layerBounds.Position.Y && fedBounds.Position.Y == layerBounds.Position.Y
+            && recoveryBounds.Position.X > layerBounds.End.X && fedBounds.Position.X > recoveryBounds.End.X,
+            "active badges should line up to the right of the Layer switch");
+        Require(recoveryBounds.Size == layerBounds.Size && fedBounds.Size == layerBounds.Size,
+            "each badge should take up the same space as the Layer switch");
         await Hover(fed);
         Require(GetViewport().GuiGetHoveredControl() == fed, "hovering the Well fed badge should hit its tooltip control");
         Hosted.Tick(150, sleeping: true);

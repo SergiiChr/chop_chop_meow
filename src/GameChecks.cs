@@ -144,44 +144,6 @@ public partial class Game {
         messages._Process(1);
         Require(messages.Shown.Length == 0 && lines.All(l => !l.Visible), "Every message must disappear once its time is up.");
     }
-    private async Task CheckTradingPostSendsOnlyCratesOffOnACart() {
-        await CloseWithEsc();
-        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(Hosted, "wood", 5); Give(Hosted, Inventory.Coins, 100);
-        var berries = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); Hosted.PickUpCrate(berries);
-        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
-        await Click(view.Screen(sign.Pos, .8f));
-        Require(Shows(sign), "Clicking a trading post must select it.");
-        Require(Named("sell") != null, "The market must offer a sell button.");
-        Require(Named("coins") != null, "The market must offer a coins button.");
-        Require(Named("hardhat") != null, "The market must offer a hire button.");
-        Require(Named("prices") != null, "The market must offer a prices button.");
-        await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·"))));
-        Require(sign.Inventory.Count == 0 && world.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
-        await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries"))));
-        Require(sign.Inventory[packed] == 1 && world.Backpack[packed] == 0, "Shift-clicking a packed crate must load it into the market input.");
-        int played = sounds.Played;
-        await Click(Named("sell")!);
-        Require(sounds.Played > played, "Sell must play the sound of the goods going.");
-        Require(world.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
-        await Click(Named("auto_sell")!);
-        Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
-        await Click(Named("filters")!); await Click(Named("filter_add_in")!);
-        await Click(Named($"pick_{World.CrateOf("berries")}")!);
-        Require(sign.Inventory.InputFilter.SequenceEqual(new[] { World.CrateOf("berries") }),
-            "The post's filter must offer the crate of berries.");
-        Require(Named("filter_add_out") == null,
-            "The post's filter must not offer a row of goods that workers do not bring.");
-        Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
-        await Click(Named("filters_close")!);
-        int before = world.DayRevenue;
-        Require(world.DailyWages == 0 && BankRevenue() == ($"+{before}", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
-        Hosted.Tick(world.Data.TradeSeconds);
-        // A crate of 12 berries at 0.82 and the crate at 3.15 pay 12 coins.
-        await Until(() => BankRevenue() == ($"+{before + 12}", Style.Ready), "the bank showing the sale's 12 coins in green, above no wages", 2);
-        RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
-        await CloseWithEsc();
-    }
 
     /// <summary>An empty pile's filter window has one row naming one resource: water there is one entry for every fill, shows in the heading, and comes off with a click.</summary>
     private async Task CheckPileFilterNamesOneResource() {
@@ -389,39 +351,6 @@ public partial class Game {
         Warp(Hosted, home); await CloseWithEsc(); await Frames(4);
     }
 
-    private async Task CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker() {
-        await CloseWithEsc();
-        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(Hosted, Inventory.Coins, 100);
-        await Click(view.Screen(sign.Pos, .8f));
-        var fetch = Named("fetch");
-        Require(ShowsChild(panel, "side_board"), "The price sheet must open.");
-        Require(panel.OffsetLeft == SidePanel.Left - MarketPanel.SheetWidth, "The price sheet must open beside the panel.");
-        Require(fetch != null, "The price sheet must offer a fetch button.");
-        Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
-        Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");
-        Require(Named("buy_wood") == null, "The price sheet must not offer wood, which the village does not sell.");
-        Require(Named("buy_berries") == null,
-            "The price sheet must not offer berries, which the village does not sell.");
-        Require(Named("buy_water") != null, "The price sheet must offer water, which the village sells.");
-        await Click(Named("buy_water")!);
-        Require(world.Orders.Count == 1 && world.Orders[0].Buying, "Buy on the price sheet must order goods.");
-        await Click(Named("hardhat")!);
-        var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
-        await Click(Named($"hire_{dear.Upfront:0}")!);
-        var hired = Hosted.Workers.LastOrDefault();
-        Require(hired != null && hired.Wage == dear.Wage, "A hiring offer must set the new worker's wage.");
-        Hosted.Assign(hired!, sign); await ClickOn(sign);
-        Require(!Named("fetch")!.Disabled, "With a worker assigned, fresh prices can be fetched.");
-        await Click(Named("fetch")!);
-        Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
-        await Click(Named("prices")!);
-        Require(!ShowsChild(panel, "side_board") && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
-        await Click(Named("prices")!); await Click(Named("sheet_close")!);
-        Require(!ShowsChild(panel, "side_board") && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
-        Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
-        await CloseWithEsc();
-    }
 
     /// <summary>A held stack shows its count by the cursor: the whole stack by left click, half of one by right click.</summary>
     private async Task CheckCarriedStackShowsItsCount() {
@@ -1191,11 +1120,10 @@ public partial class Game {
             await RunStrawBedUIChecks();
             await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
-            await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
+            await RunTradingPostUIChecks();
             await TestClean(CheckPileFilterNamesOneResource);
             await TestClean(CheckItemListRunsByGroupSimplestFirst);
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
-            await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await RunGoalUIChecks(freshGame: false);
             await RunCraftingUIChecks();
             await RunGlassJarUIChecks();

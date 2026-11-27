@@ -5,7 +5,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Whether the filter window is open beside the panel, whether its item list is shown, and which row that list adds to.</summary>
+/// <summary>Whether the filter window is open, whether its item list is shown, and which row that list adds to.</summary>
 public sealed class FilterState {
     public bool Open, Picking, Output;
 }

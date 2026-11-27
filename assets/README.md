@@ -249,11 +249,17 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons, tinted in code.
+- Colored menu illustrations named `menu_*` for Build, Backpack, Crafting, Recipe map, Crew and Diary on the bottom bar.
+  They sit on matte rounded-square badges and keep their own colors.
+  The Crafting header and the trading post's Workers tab use the same illustrations as their bottom-bar badges.
+- Line glyphs named `line_*` for panel controls and status badges, tinted in code.
   The building plans use a trash can for the remove selector, jobs use a minus, and the close buttons use an X.
   Crafting and the Goal Log use the same chevrons to show whether a group is open.
 - `trade_cart.svg`, `prices.svg` and `mailbox.svg` are colored illustrations for the trading post.
-  The cart carries crates, and the Prices icon pairs a green rising line with a red falling line.
+  The cart carries crates, and the chart on the price sheet pairs a green rising line with a red falling line.
+  `hardhat_illustration.svg` shows the worker's tall hard hat on the price errand button.
+- Food effect glyphs show a sprinting boot for Carb load, a heart with a plus for Protein recovery, a heaped bowl for
+  Well fed and a shield for Vitamins. Their badges have distinct colors and sit to the right of the Layer switch.
 - `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
   loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
   writing in the dark does, ending in a stroke trailing down the page.
