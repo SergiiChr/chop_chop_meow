@@ -16,8 +16,8 @@ public partial class Game {
     private async Task JamShowsAtMostOneFullHungerBar() {
         Give(Hosted, BerryJam.Bottle);
         Give(Hosted, "canned_jam");
-        Hosted.Got(BerryJam.Liquid);
-        Hosted.Got("canned_jam");
+        bool knewJam = Hosted.Had("canned_jam");
+        var restoreDiscoveries = TemporarilyDiscover(Hosted, BerryJam.Liquid, "canned_jam");
         await KeyStroke(Key.Tab);
         await Until(() => world.Backpack[BerryJam.Bottle] > 0 && world.Backpack["canned_jam"] > 0 && world.Had("canned_jam"),
             "both jams in the backpack and discovered on the map");
@@ -36,6 +36,8 @@ public partial class Game {
         Drop(Hosted, BerryJam.Bottle, 1);
         Drop(Hosted, "canned_jam", 1);
         await CloseWithEsc();
+        restoreDiscoveries();
+        await Until(() => world.Had("canned_jam") == knewJam, "the jam's original discovery state restored");
     }
 
     private async Task CookingOutputShowsWhatTheFoodRestores() {
@@ -73,7 +75,7 @@ public partial class Game {
         Require(stew.TooltipText.Contains("Hunger: fills to 150%\nEffects:\n• Well fed:")
             && stew.TooltipText.Contains("• Protein recovery:") && !stew.TooltipText.Contains("LMB:"),
             "the stew's description should show hunger and both effects with no controls line");
-        Hosted.Got("meat_stew");
+        var restoreDiscoveries = TemporarilyDiscover(Hosted, "meat_stew");
         await Until(() => world.Had("meat_stew"), "the map knowing the meat stew recipe");
         await Click(stew, alt: true);
         await Until(() => recipeMap.Visible && recipeMap.Chosen == "meat_stew", "the meat stew card highlighted");
@@ -96,6 +98,7 @@ public partial class Game {
         Hosted.Tick(271, sleeping: true);
         await Until(() => !foodEffectRow.Visible, "Well fed and the empty row disappearing below 100% hunger");
         SetNeeds(Hosted, hunger, thirst, health);
+        restoreDiscoveries();
         await Hover(needsPlate.Hunger);
     }
 }
