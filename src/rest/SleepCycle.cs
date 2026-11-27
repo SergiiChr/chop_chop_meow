@@ -106,8 +106,8 @@ public sealed class SleepCycle(World world) {
         if (dawn) {
             if (!SomeoneAsleep()) return;
             var cabins = world.BedtimeWater.Occupants();
-            if (!speedingUp && !Recovering) BedtimeWater.FillBottles(cabins);
-            BedtimeWater.ServeThirst(cabins);
+            if (!speedingUp && !Recovering) world.BedtimeWater.FillBottles(cabins);
+            world.BedtimeWater.ServeThirst(cabins);
             foreach (var p in world.Players) p.SleepingAt = 0;
             AnnounceDawn();
         } else foreach (var p in world.Players) {
@@ -156,7 +156,7 @@ public sealed class SleepCycle(World world) {
         if (elapsed <= 0) return;
         long began = Stopwatch.GetTimestamp();
         if (!speedingUp) {
-            BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
+            world.BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
             speedingUp = true;
         }
         // Do not accumulate work during a slow frame: do what fits now and leave the next frame its own budget.
@@ -178,7 +178,7 @@ public sealed class SleepCycle(World world) {
     /// <summary>Advances to dawn from the recovery screen when nobody is able to play.</summary>
     internal void SkipToDawnAfterDeath() {
         float dawn = Dawn;
-        BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
+        world.BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
         Recovering = AdvancingTime = true;
         try {
             while (world.Time < dawn) {

@@ -61,8 +61,8 @@ internal static class ItemTreeActions {
         }
         if (data.VesselOf(item) != null) yield return "Transport liquids";
         if (data.VesselFor(item) == null) yield break;
-        var fills = data.Vessels.Where(vessel => vessel.Liquid == item).Select(vessel => data.Items[vessel.Full]);
-        if (fills.Any(fill => fill.Hunger > 0)) yield return "Food";
-        if (fills.Any(fill => fill.Thirst > 0)) yield return "Drink";
+        var vessels = data.Vessels.Where(vessel => vessel.Liquid == item);
+        if (vessels.Any(vessel => vessel.Hunger > 0)) yield return "Food";
+        if (vessels.Any(vessel => vessel.Thirst > 0)) yield return "Drink";
     }
 }

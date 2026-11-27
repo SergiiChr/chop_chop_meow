@@ -72,7 +72,7 @@ public sealed partial class World {
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
             if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelHaul.Vessel(w.Tool)) return true;
-            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Liters(w.Tool) >= 0) return true;
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Is(w.Tool)) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;
@@ -109,7 +109,7 @@ public sealed partial class World {
         w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
         if (!Walk(w, dest.Pos, dt)) return true;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
-        if (PoursInto(dest, into, item) is VesselDef pours) Carry(w.Bag, into, dest, pours.Liquid, room, room);
+        if (PoursInto(dest, into, item, w.Bag.Object(item)) is VesselDef pours) PourLiters(w.Bag, into, pours, room);
         else if (FuelSplit(dest, item, w.Bag[item]) is (int fuel, int input)) {
             w.Bag.TransferTo(dest.Burner!, item, fuel, true);
             w.Bag.TransferTo(dest.Inventory, item, input, true);
@@ -134,13 +134,13 @@ public sealed partial class World {
     internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling, Item? unit = null) {
         int room;
         if (IsStation(dest.Kind)) {
-            if (!fueling && (room = InputRoom(dest, item)) > 0) return (dest.Inventory, room);
+            if (!fueling && (room = InputRoom(dest, item, unit)) > 0) return (dest.Inventory, room);
             return dest.Burner is Inventory burner && Fuels(dest).Contains(item) && FuelTakes(dest, item) && (room = burner.Room(item)) > 0 ? (burner, room) : null;
         }
         room = dest.Kind switch {
             ThingKind.Mine => Mines.Need(dest, item),
             ThingKind.Farm => Farms.SowRoom(dest, item),
-            ThingKind.Barrel when PoursInto(dest, dest.Inventory, item) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
+            ThingKind.Barrel when PoursInto(dest, dest.Inventory, item, unit) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
                 => dest.Inventory.Room(vessel.Liquid),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Accepts(item, unit) => 0,
@@ -169,8 +169,8 @@ public sealed partial class World {
     /// How many more of an item a station's input slot takes: up to a stack of what the recipe it is on uses.
     /// A vessel counts as the liters of room for the liquid it pours.
     /// </summary>
-    private int InputRoom(Thing t, string item) {
-        string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
+    private int InputRoom(Thing t, string item, Item? unit = null) {
+        string lands = PoursInto(t, t.Inventory, item, unit)?.Liquid ?? item;
         if (Data.VesselFor(lands) != null && lands == item || !BatchCost(t).ContainsKey(lands)) return 0;
         return Math.Max(0, t.Inventory.SlotRoom(lands));
     }

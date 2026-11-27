@@ -639,8 +639,10 @@ Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
 Stations hold water (`Water.Liquid`) and jam (`BerryJam.Liquid`) in liters, with drawn droplet icons.
 Stations and barrels hold liquids loose. The canning station uses one liter of jam and one tin can per batch.
-`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/containers/Vessels.cs` holds the rules for all of them:
-a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
+`GameData.Vessels` lists each refillable vessel with each liquid it holds (`VesselDef`: the empty container's item, the liquid, its liters, and the look and name at each fill), and `src/containers/Vessels.cs` holds the rules for all of them.
+An empty bottle, bucket or barrel is a plain item; holding liquid, it is an `Item` object whose `Contents` hold the liters, found by its key such as `steel_bucket#12` (`World.SetFill` changes a fill in its cell, `Vessels` reads it).
+Storage names a container by its empty item, which takes only empty ones, or by a container holding a liquid at any fill (`World.HoldingOf`, shown as "Steel bucket of water"); no storage names a bare liquid, and a tool rack takes its buckets and bottles whatever they hold (`Inventory.ByKind`).
+A vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessel`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).

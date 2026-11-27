@@ -14,13 +14,22 @@ internal sealed class BedtimeWater(World world) {
     }
 
     private static int Supply(Thing cabin) =>
-        Barrel.In(cabin.Inventory) is string item && cabin.Inventory.Free(item) > 0 ? Barrel.Liters(item) : 0;
+        Barrel.In(cabin.Inventory) is string item && cabin.Inventory.Free(item) > 0 ? Barrel.Liters(cabin.Inventory.Object(item)) : 0;
 
     private static int BottleRoom(PlayerState player) {
-        int liters = 0;
-        for (int held = 0; held < Water.Capacity; held++)
-            liters += player.Backpack.Free(Water.WaterItem(held)) * (Water.Capacity - held);
+        var box = player.Backpack;
+        int liters = box.Free(Water.Empty) * Water.Capacity;
+        foreach (var (item, _) in box.Items) if (Water.BottleLiters(box, item) is > 0 and int held && box.Free(item) > 0) liters += Water.Capacity - held;
         return liters;
+    }
+
+    /// <summary>The fullest water bottle in a backpack that still has room, an empty one last, or null.</summary>
+    private static string? FullestRoomyBottle(Inventory box) {
+        string? fullest = box.Free(Water.Empty) > 0 ? Water.Empty : null;
+        int most = 0;
+        foreach (var (item, _) in box.Items)
+            if (Water.BottleLiters(box, item) is > 0 and int held && held < Water.Capacity && held > most && box.Free(item) > 0) { fullest = item; most = held; }
+        return fullest;
     }
 
     /// <summary>Projects thirst before sleep starts and on waking, using the cabin barrel's current water.</summary>
@@ -67,27 +76,25 @@ internal sealed class BedtimeWater(World world) {
     private static bool Before(PlayerState a, PlayerState b) =>
         a.CabinEntry < b.CabinEntry || a.CabinEntry == b.CabinEntry && a.Id < b.Id;
 
-    internal static void Drink(PlayerState player, Thing cabin, int limit = int.MaxValue) {
+    internal void Drink(PlayerState player, Thing cabin, int limit = int.MaxValue) {
         if (player.Health > 0 && player.Thirst < 100 && limit > 0)
-            player.Thirst = Drank(player.Thirst, Barrels.TakeWater(cabin, Math.Min(limit, ThirstLiters(player.Thirst))));
+            player.Thirst = Drank(player.Thirst, world.Barrels.TakeWater(cabin, Math.Min(limit, ThirstLiters(player.Thirst))));
     }
 
     /// <summary>Serves sleepers in entry order when they wake together.</summary>
-    internal static void ServeThirst((PlayerState Player, Thing Cabin)[] occupants) {
+    internal void ServeThirst((PlayerState Player, Thing Cabin)[] occupants) {
         foreach (var (player, cabin) in occupants) Drink(player, cabin);
     }
 
     /// <summary>Fills bottles in entry order after everyone has had their bedtime drink.</summary>
-    internal static void FillBottles((PlayerState Player, Thing Cabin)[] occupants) {
+    internal void FillBottles((PlayerState Player, Thing Cabin)[] occupants) {
         foreach (var (player, cabin) in occupants) {
-            if (player.Health <= 0 || Supply(cabin) == 0) continue;
-            for (int held = Water.Capacity - 1; held >= 0; held--) {
-                string bottle = Water.WaterItem(held);
-                while (player.Backpack.Free(bottle) > 0 && Supply(cabin) is > 0 and int available) {
-                    int add = Math.Min(available, Water.Capacity - held);
-                    if (!player.Backpack.ReplaceOne(bottle, Water.WaterItem(held + add))) break;
-                    Barrels.TakeWater(cabin, add);
-                }
+            if (player.Health <= 0) continue;
+            var box = player.Backpack;
+            while (Supply(cabin) is > 0 and int available && FullestRoomyBottle(box) is string bottle) {
+                int held = Math.Max(0, Water.BottleLiters(box, bottle)), add = Math.Min(available, Water.Capacity - held);
+                if (world.SetFill(box, bottle, Water.Liquid, held + add) == null) break;
+                world.Barrels.TakeWater(cabin, add);
             }
         }
     }

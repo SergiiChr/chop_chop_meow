@@ -25,6 +25,11 @@ public sealed class ItemDef {
     public string Description { get; set; } = "";
     /// <summary>In-game days each unit lasts from when it is caught, or 0 for one that never expires.</summary>
     public int LifeDays { get; set; }
+    /// <summary>
+    /// For an id that stands for a vessel full of a liquid, such as the water bottle the village sells: the liquid.
+    /// Such an id is bought, waited for on the hotbar and shown on the map, but never lies in a box: it arrives as the vessel holding the liquid.
+    /// </summary>
+    public string? FullOf { get; set; }
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -75,15 +80,25 @@ public sealed class RecipeDef {
 /// the liquid leaves a station only into vessels with room for it.
 /// </summary>
 public sealed class VesselDef {
-    /// <summary>Its item at each fill, from empty to full: the index is the liters it holds.</summary>
-    public List<string> States { get; set; } = new();
+    /// <summary>The container, as the item id of an empty one; holding some of its liquid, it is an <see cref="Item"/> object of that kind.</summary>
+    public string Empty { get; set; } = "";
     /// <summary>What it pours out, a liter at a time, which only stations hold.</summary>
     public string Liquid { get; set; } = "";
-    public string Empty => States[0];
-    public string Full => States[^1];
-    public int Capacity => States.Count - 1;
-    /// <summary>The liters an item of this vessel holds, or -1 for another item.</summary>
-    public int LitersIn(string item) => States.IndexOf(item);
+    public int Capacity { get; set; }
+    /// <summary>The icon and model it shows at each fill, from empty to full, the index being the liters it holds; one picture for every fill when empty.</summary>
+    public List<string> Looks { get; set; } = new();
+    /// <summary>Its name holding some liters, with <c>{0}</c> for the liters, when <see cref="Names"/> gives none.</summary>
+    public string Named { get; set; } = "";
+    /// <summary>Its name at each fill, from empty to full, when the liters do not simply fill in <see cref="Named"/>.</summary>
+    public List<string> Names { get; set; } = new();
+    /// <summary>What eating or drinking a liter from it restores, or 0 for a vessel nobody drinks or eats from.</summary>
+    public float Hunger { get; set; }
+    public float Thirst { get; set; }
+    /// <summary>The icon and model it shows holding so many liters.</summary>
+    public string Look(int liters) => Looks.Count == 0 ? Empty : Looks[Math.Clamp(liters, 0, Looks.Count - 1)];
+    /// <summary>Its name holding so many liters.</summary>
+    public string Name(int liters, GameData data) =>
+        liters <= 0 ? data.Items[Empty].Name : liters < Names.Count ? Names[liters] : string.Format(System.Globalization.CultureInfo.InvariantCulture, Named, liters);
 }
 /// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
 public sealed class SourceDef {
@@ -236,28 +251,16 @@ public sealed partial class GameData {
     /// <summary>The game's values, checked to fit together.</summary>
     public static GameData Create() {
         var data = new GameData();
-        for (int liters = 1; liters <= Barrel.Capacity; liters++)
-            data.Items.Add(Barrel.AtFill(liters), new() { Name = $"Steel barrel ({liters} L)", Color = data.Items[Barrel.Item].Color });
-        for (int liters = 1; liters <= Bucket.Capacity; liters++)
-            data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
-        for (int liters = 1; liters < BerryJam.Bottles.Length; liters++)
-            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter });
-        for (int liters = 1; liters <= Bucket.Capacity; liters++)
-            data.Items.Add(BerryJam.Buckets[liters], new() { Name = $"Steel bucket ({liters} L berry jam)", Color = data.Items[Bucket.Item].Color });
-        for (int liters = 1; liters <= Barrel.Capacity; liters++)
-            data.Items.Add(BerryJam.Barrels[liters], new() { Name = $"Steel barrel ({liters} L berry jam)", Color = data.Items[Barrel.Item].Color });
         data.Validate();
         Inventory.Unstacked.Clear(); Inventory.Expiring.Clear();
         foreach (var (id, item) in data.Items) if (item.LifeDays > 0) Inventory.Expiring.Add(id);
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
-        // Empty buckets stack.
-        // Filled vessels and barrels each take a cell.
-        foreach (var vessel in data.Vessels) foreach (string id in vessel.States) if (id != Bucket.Item) Inventory.Unstacked.Add(id);
-        for (int i = 1; i <= Barrel.Capacity; i++) { Inventory.Unstacked.Add(Barrel.Fills[i]); Inventory.Unstacked.Add(BerryJam.Barrels[i]); }
+        // Empty bottles take a cell each, while empty buckets and barrels stack; one holding something is an object, a cell each.
+        Inventory.Unstacked.Add(Water.Empty);
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || GravelSpeed < 1 || GravelSpeed >= WolfChase || WolvesPerDen < 1 || WolfHealth <= 0 || WolfBite <= 0 || WolfTrot <= 0 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || GravelSpeed < 1 || GravelSpeed >= WolfChase || WolvesPerDen < 1 || WolfHealth <= 0 || WolfBite <= 0 || WolfTrot <= 0 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || !Items.ContainsKey(Water.Empty) || !Items.ContainsKey(Water.Full))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)
@@ -302,17 +305,21 @@ public sealed partial class GameData {
         if (Recipes.FirstOrDefault(p => p.Value.Worked && p.Value.Station != ThingKind.Cooktable).Key is string misplaced)
             throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
         foreach (var v in Vessels) {
-            if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
+            if (v.Capacity <= 0 || !Items.ContainsKey(v.Empty) || !Items.ContainsKey(v.Liquid) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Hand && (r.Output == v.Liquid || r.Inputs.ContainsKey(v.Liquid))))
-                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
+                throw new InvalidOperationException($"Invalid vessel: {v.Empty} of {v.Liquid}. Its liquid is only poured into stations, and no hand recipe takes it.");
+            if (v.Looks.Count is not 0 && v.Looks.Count != v.Capacity + 1 || (v.Names.Count == 0 ? v.Named == "" : v.Names.Count != v.Capacity + 1))
+                throw new InvalidOperationException($"Invalid vessel: {v.Empty} of {v.Liquid}. It needs a look and a name for every fill.");
             vesselFor.TryAdd(v.Liquid, v);
-            if (vesselOf.TryGetValue(v.Empty, out var same) && (same.Empty != v.Empty || same.Capacity != v.Capacity))
-                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Shared empty vessels must have the same capacity.");
+            if (vesselOf.TryGetValue(v.Empty, out var same) && same.Capacity != v.Capacity)
+                throw new InvalidOperationException($"Invalid vessel: {v.Empty} of {v.Liquid}. Shared empty vessels must have the same capacity.");
             vesselOf.TryAdd(v.Empty, v);
-            for (int fill = 1; fill < v.States.Count; fill++)
-                if (!vesselOf.TryAdd(v.States[fill], v))
-                    throw new InvalidOperationException($"Invalid vessel: {v.Full}. Every filled state belongs to only one vessel.");
+            if (!vesselHolding.TryAdd((v.Empty, v.Liquid), v))
+                throw new InvalidOperationException($"Invalid vessel: {v.Empty} of {v.Liquid}. A container has one vessel for each liquid.");
         }
+        foreach (var (id, item) in Items)
+            if (item.FullOf is string liquid && (VesselFor(liquid) == null || Market.Sells.ContainsKey(id) || Recipes.Values.Any(r => r.Output == id || r.Inputs.ContainsKey(id))))
+                throw new InvalidOperationException($"{id}: a full vessel the village sells needs a vessel for its liquid and is no recipe's input or output.");
         // Every diary day is in exactly one find, and the finds hold as many days as the diary, so none holds a day it lacks.
         int held = 0;
         foreach (var find in DiaryFindDef.All) {
@@ -329,10 +336,13 @@ public sealed partial class GameData {
     }
     /// <summary>The vessel that carries a liquid, or null for an item that is not one.</summary>
     public VesselDef? VesselFor(string liquid) => vesselFor.GetValueOrDefault(liquid);
-    /// <summary>The vessel an item is a state of, at any fill, or null.</summary>
-    public VesselDef? VesselOf(string item) => vesselOf.GetValueOrDefault(item);
-    // Filled by Validate: each liquid's vessel and each fill's vessel.
+    /// <summary>A vessel of the container an item is, empty or holding something, for its capacity, or null for anything else.</summary>
+    public VesselDef? VesselOf(string item) => vesselOf.GetValueOrDefault(Item.KindOf(item));
+    /// <summary>The vessel a container is while holding a liquid, or null when it cannot hold that liquid.</summary>
+    public VesselDef? VesselOf(string container, string liquid) => vesselHolding.GetValueOrDefault((Item.KindOf(container), liquid));
+    // Filled by Validate: each liquid's vessel, each container's first vessel and each container's vessel for each liquid.
     private readonly Dictionary<string, VesselDef> vesselFor = new(), vesselOf = new();
+    private readonly Dictionary<(string Container, string Liquid), VesselDef> vesselHolding = new();
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
@@ -341,7 +351,7 @@ public sealed partial class GameData {
     private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
     /// <summary>The Recipe map groups packed crates and container fills with their base item.</summary>
-    public string MapEntryOf(string item) => World.IsPacked(item) ? "crate" : VesselOf(item)?.Empty ?? ContainerItem.Base(item);
+    public string MapEntryOf(string item) => World.IsPacked(item) ? World.Crate : Items.GetValueOrDefault(item)?.FullOf is string liquid ? VesselFor(liquid)!.Empty : Item.KindOf(item);
     /// <summary>The name of the item's Recipe map entry.</summary>
     public string NameOnMap(string item) => Items.TryGetValue(item, out var def) && def.MapName is string name ? name : Name(item);
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -434,7 +444,7 @@ public sealed partial class GameData {
             .ThenBy(item => mapOrder.GetValueOrDefault(item.Entry, mapOrder.Count)).Select(item => item.Item).ToArray();
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
-    public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && def.FullOf == null && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
     public string DescriptionLine(string item) => ItemDefinition(item) is { Description.Length: > 0 } def ? "\n" + def.Description : "";
@@ -470,7 +480,10 @@ public sealed partial class GameData {
     /// <summary>Whether an id, such as a hotbar slot's, names a building plan, and which.</summary>
     public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
     public bool IsBuilding(string id) => TryBuilding(id, out _);
-    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : ItemDefinition(id)?.Name ?? (Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' '));
+    /// <summary>An item's name; a container holding something, which only its box can say more of, goes by its kind's name on the map, such as "Bottle".</summary>
+    public string Name(string id) => World.IsCrate(id) ? Items[World.Crate].Name
+        : Item.IsKey(id) && Array.IndexOf(Item.Holders, Item.KindOf(id)) >= 0 ? NameOnMap(Item.KindOf(id))
+        : ItemDefinition(id)?.Name ?? (Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' '));
     public string Name(ThingKind kind) {
         if (Items.TryGetValue(kind.Id(), out var item)) return item.Name;
         if (Buildings.TryGetValue(kind, out var building)) return building.Name;

@@ -47,8 +47,8 @@ public sealed partial class World {
         if (TransferSlot(from, bag, at, cell, item, heldCount) > 0) Bind(slot, cell);
     }
 
-    /// <summary>Whether a backpack stack of <paramref name="item"/> is what a hotbar slot waiting for <paramref name="waiting"/> takes: the item itself, or any bottle for a bottle.</summary>
-    private static bool Waits(string waiting, string item) => item == waiting || Water.IsBottle(item) && Water.IsBottle(waiting);
+    /// <summary>Whether a backpack stack of <paramref name="item"/> is what a hotbar slot waiting for <paramref name="waiting"/> takes: the item itself, or any bottle for a bottle or a water bottle.</summary>
+    private static bool Waits(string waiting, string item) => item == waiting || Water.IsBottle(item) && (Water.IsBottle(waiting) || waiting == Water.Full);
 
     /// <summary>
     /// Server: binds each hotbar slot that waits for an item to the first unbound backpack stack of it, once one is there.

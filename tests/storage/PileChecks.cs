@@ -139,14 +139,14 @@ public static class PileChecks {
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         var compost = world.Add(ThingKind.Pile, new Vector2(16, 24));
         Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
-        chest.Inventory.Add(BerryJam.Bottle, 1);
-        chest.Inventory.Add(BerryJam.Bottles[2], 1);
+        StockVessel(world, chest.Inventory, Water.Empty, BerryJam.Liquid, 3);
+        StockVessel(world, chest.Inventory, Water.Empty, BerryJam.Liquid, 2);
         chest.Inventory.Add("leaves", 2);
         var tender = AddWorker(world, new Vector2(17, 22));
         world.SetDuty(tender, compost, JobKind.Tend, true);
 
         Work(world, 65, () => compost.Inventory["fertilizer"] == 1);
-        Require(compost.Inventory["fertilizer"] == 1 && compost.Inventory[BerryJam.Bottle] == 0 && compost.Inventory[BerryJam.Bottles[2]] == 0,
+        Require(compost.Inventory["fertilizer"] == 1 && Vessels.Count(compost.Inventory, Water.Empty, BerryJam.Liquid, 3) == 0 && Vessels.Count(compost.Inventory, Water.Empty, BerryJam.Liquid, 2) == 0,
             "the two bottles' jam and two leaves should make one fertilizer");
         world.Player = compost.Pos + Vector2.Down;
         Require(world.Transfer(compost.Inventory, world.Backpack, Water.Empty, 2) == 2,

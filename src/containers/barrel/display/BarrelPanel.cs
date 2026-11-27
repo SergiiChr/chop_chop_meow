@@ -11,13 +11,13 @@ public partial class BarrelPanel(PageTools tools, Thing subject) : ThingPage(too
         FilterButton();
         var (cell, count) = WaterCell();
         moves.TakeCell(cell, thing.Inventory, () => Barrels.LiquidIn(thing), thing,
-            held => held.Stack is HeldStack stack && Barrels.Accepts(world.Data, thing, stack.Item),
+            held => held.Stack is HeldStack stack && Barrels.Accepts(world.Data, thing, stack.Item, world.HeldBox?.Object(stack.Item)),
             (item, units) => moves.Store(thing.Inventory, -1)(item, units));
         ShowContents(live, cell, count, () => Barrels.LiquidIn(thing), () => thing.Inventory.Count, StationSlots.SlotHint);
         Well(new HBoxContainer()).AddChild(cell);
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        StoreBagGrid(id => Barrels.Accepts(world.Data, thing, id));
+        StoreBagGrid(id => Barrels.Accepts(world.Data, thing, id, world.S.Backpack.Object(id)));
         JobButtons();
     }
 

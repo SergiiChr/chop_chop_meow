@@ -111,8 +111,8 @@ public static class HotbarStackChecks {
 
     private static void CheckABottleStaysBoundThroughSips(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, Water.Full, 1);
-        PutOnHotbar(world, SlotOf(world.Backpack, Water.Full), 8);
+        string bottle = GiveWater(world);
+        PutOnHotbar(world, SlotOf(world.Backpack, bottle), 8);
         SetNeeds(world, thirst: 20);
         for (int liter = 0; liter < 3; liter++) world.Consume(world.HotbarItem(8));
         Require(world.HotbarItem(8) == Water.Empty, "a bound bottle should stay bound through every liter drunk, empty at the end");

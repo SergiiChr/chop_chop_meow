@@ -91,8 +91,8 @@ public static class TradeChecks {
         var box = output.Items.Keys.SingleOrDefault(World.IsCrate);
         Require(world.Orders.Count == 0, "cart should finish the order after delivering");
         Require(box == null, "cart should not leave a box for a refillable bottle");
-        Require(output["water"] == 1, "cart should deliver one refillable bottle directly to the market output");
-        Require(world.Backpack["water"] == 0, "cart should not put the delivered bottle in the backpack");
+        Require(Vessels.Count(output, Water.Empty, Water.Liquid, Water.Capacity) == 1, "cart should deliver one refillable bottle directly to the market output");
+        Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 0, "cart should not put the delivered bottle in the backpack");
     }
 
     /// <summary>A sale pays when the cart returns and lowers demand, and the price sheet only changes when someone brings news.</summary>

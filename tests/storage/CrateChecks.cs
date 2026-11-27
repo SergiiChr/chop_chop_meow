@@ -46,7 +46,7 @@ public static class CrateChecks {
         crate.Remove("berries", cap / 2);
         Require(crate.ShownSlots == 1 + cap - cap / 2, "half a stack leaves one single-item slot per free unit");
         crate.Remove("berries", cap);
-        foreach (var item in new[] { "wood", "stone", "berries", "water", "coal", "iron_ore", "planks", "wood_parts", "iron_bar", "steel_bar", "tin_bar", "steel_parts" }.Take(cap)) crate.Add(item, 1);
+        foreach (var item in new[] { "wood", "stone", "berries", "flour", "coal", "iron_ore", "planks", "wood_parts", "iron_bar", "steel_bar", "tin_bar", "steel_parts" }.Take(cap)) crate.Add(item, 1);
         Require(crate.UsedSlots == cap, "a crate should give each different item its own slot");
         Require(crate.Count == cap, "a crate should count as many different single items as it holds");
         Require(crate.Room("raw_meat") == 0, "a crate full of single items should have no room for more");

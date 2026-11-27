@@ -59,7 +59,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
                 Click = () => { state.Picking = !state.Picking; state.Output = output; redraw(); },
                 Takes = held => held.Stack is HeldStack stack && CanName(stack.Item),
                 Put = (held, _) => {
-                    string item = barrel ? Barrels.PouredLiquid(world.Data, held.Item!)! : World.FilterEntry(held.Item!, world.HeldBox?.Object(held.Item!));
+                    string item = barrel ? Barrels.PouredLiquid(world.Data, held.Item!, world.HeldBox?.Object(held.Item!))! : World.FilterEntry(held.Item!, world.HeldBox?.Object(held.Item!));
                     world.SetFilter(t, item, output, true); held.Release();
                 },
             };
@@ -75,7 +75,10 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             if (pile) crates = crates.Append(World.MixedCrate);
             var items = world.Data.ListOrder.Where(Holds);
             if (pile) items = items.Select(id => world.PileEntry(id)).Distinct();
-            var choices = barrel ? items.Where(id => world.Data.VesselFor(id) != null) : post ? crates : items.Concat(crates);
+            // Storage names no bare liquid: a container's own entry takes it empty, and one for a liquid takes it holding that liquid at any fill.
+            var holding = world.HoldingEntries.Where(id => world.HoldingIn(id) is var (container, _) && Holds(container));
+            var choices = barrel ? items.Where(id => world.Data.VesselFor(id) != null)
+                : post ? crates : items.Where(id => world.Data.VesselFor(id) == null && world.Data.Items[id].FullOf == null).Concat(holding).Concat(crates);
             if (!single) choices = choices.Prepend(Inventory.Everything);
             foreach (var id in choices) {
                 var cell = FilterCell($"pick_{id}", id);
@@ -89,7 +92,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         bool Holds(string item) => world.Holds(t, item) && !World.Nests(t, item);
 
         bool CanName(string item) {
-            if (barrel) return Barrels.PouredLiquid(world.Data, item) != null;
+            if (barrel) return Barrels.PouredLiquid(world.Data, item, world.HeldBox?.Object(item)) != null;
             if (World.Nests(t, item)) return false;
             string? good = World.PackedGood(world.HeldBox?.Object(item));
             return good != null && (pile || good != "") || !post && world.Data.HasItem(item);

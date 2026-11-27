@@ -18,7 +18,8 @@ internal sealed class StationHaul : PlaceHaul {
             bool full = recipe != null && (!World.IsProduct(recipe.Output, item) || t.Inventory.SlotRoom(recipe.Output) < recipe.Amount);
             if (data.VesselFor(item) is VesselDef v) {
                 // A liquid leaves in vessels with room for it, which the hauler brings, fills here and stores.
-                if (world.DepositFor(v.Full, t.Pos, t.Id) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;
+                var filled = world.FullVessel(v);
+                if (world.DepositFor(filled.Key, t.Pos, t.Id, filled) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;
                 Offer(ref best, new Carry { Place = t, From = holder, To = t, Item = roomy, Count = (free + v.Capacity - 1) / v.Capacity, DrainLiquid = item, Rule = full ? 2 : 4, Order = -free });
             } else if (Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, full));
         }
@@ -28,7 +29,7 @@ internal sealed class StationHaul : PlaceHaul {
             if (room <= 0) continue;
             // A liquid comes in the vessels that pour it, enough of them for the liters of room.
             if (data.VesselFor(input) is VesselDef carrier) {
-                if (world.LiquidSource(carrier, w.Pos) is (string filled, Thing holder)) Offer(ref best, Bring(t, holder, filled, (room + carrier.LitersIn(filled) - 1) / carrier.LitersIn(filled), have, batch));
+                if (world.LiquidSource(carrier, w.Pos) is (string filled, Thing holder)) Offer(ref best, Bring(t, holder, filled, (room + Vessels.LitersIn(holder.Inventory, filled) - 1) / Vessels.LitersIn(holder.Inventory, filled), have, batch));
             } else if (world.SourceFor(input, w.Pos, t.Id) is Thing source) Offer(ref best, Bring(t, source, input, room + FuelRoom(t, recipe, input), have, batch));
         }
         if (recipe.Fuels.Count == 0 || t.Burner is not Inventory burner) return;

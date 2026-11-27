@@ -36,15 +36,15 @@ public partial class Game {
         Require(world.Backpack["berries"] == berries - 1, "A right click on open ground must eat one selected berry.");
         Require(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
         // The ninth slot drinks only from the bottle bound to it, so the bottles carried go aside and the slot waits for the full one given here.
-        var bottles = new[] { "empty_bottle", "water_1", "water_2", "water" }.Select(b => (b, Drop(Hosted, b))).ToArray();
-        SetHotbarSlot(Hosted, 8, "water"); Give(Hosted, "water", 1); SetNeeds(Hosted, thirst: 20);
+        var bottles = Enumerable.Range(0, Water.Capacity + 1).Select(liters => (liters, DropVessels(Hosted, Water.Empty, Water.Liquid, liters))).ToArray();
+        SetHotbarSlot(Hosted, 8, Water.Full); GiveWater(Hosted); SetNeeds(Hosted, thirst: 20);
         await Until(() => !hotbar.Buttons[8].Disabled && world.HotbarStack(8) >= 0, "the hotbar showing the water", 2);
         await Click(hotbar.Buttons[8]);
         await Until(() => world.ActiveHotbar == 8, "a click selecting the hotbar slot once no second press follows", 2);
-        Require(world.Backpack["water"] == 1, "Clicking a hotbar slot must only select it.");
+        Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 1, "Clicking a hotbar slot must only select it.");
         await ClickGround(MouseButton.Right);
-        Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A right click on open ground must drink the selected water.");
-        foreach (var (bottle, count) in bottles) Give(Hosted, bottle, count);
+        Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 0 && world.Thirst > 20, "A right click on open ground must drink the selected water.");
+        foreach (var (liters, count) in bottles) if (count > 0) GiveVessel(Hosted, Water.Empty, Water.Liquid, liters, count);
         await Frames();
     }
 

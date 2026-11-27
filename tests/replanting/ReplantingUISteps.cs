@@ -46,7 +46,7 @@ public partial class Game {
         await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && ShowsResourceStock("wood", "0"),
             "the planted tree showing its status, wood count, and water needed", 4);
         Require(!HasLabel(panel, "Pour from a filled bottle or bucket"), "the water amount should be enough text beside the slot");
-        await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), OnPage($"input_{Water.Liquid}")!);
+        await Carry(BagCellOf(bucket), OnPage($"input_{Water.Liquid}")!);
         await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0
             && OnPage($"input_{Water.Liquid}") == null && !bag.Visible,
             "the tree showing Growing and closing its watering controls after the bucket is poured", 4);

@@ -113,10 +113,10 @@ public static class ReplantingChecks {
     private static void CheckWateredTreeKeepsGrowingAfterBecomingAnAdult(GameData data) {
         var world = EmptyWorld(data);
         var tree = PlantAnAcorn(world);
-        PourIntoTree(world, tree, Water.Full, Water.Empty);
+        PourIntoTree(world, tree, Water.Empty, Water.Capacity, 0);
         RunUntil(world, world.Time + data.DaySeconds * 12);
         Require(tree.Remaining == 0 && tree.Inventory[Water.Liquid] == 3, "three liters should leave the acorn dormant");
-        PourIntoTree(world, tree, Bucket.AtFill(6), Bucket.AtFill(4));
+        PourIntoTree(world, tree, Bucket.Item, 6, 4);
         float watered = world.Time;
         RunUntil(world, watered + data.DaySeconds - 1);
         Require(tree.Remaining == 0, "the tree should have no wood until the first full day after watering");
@@ -155,7 +155,7 @@ public static class ReplantingChecks {
     private static void CheckLeafSpotGrowsWithTheTreeAndStaysAfterFelling(GameData data) {
         var world = EmptyWorld(data);
         var tree = PlantAnAcorn(world);
-        PourIntoTree(world, tree, Bucket.AtFill(5), Bucket.Item);
+        PourIntoTree(world, tree, Bucket.Item, 5, 0);
         RunUntil(world, world.Time + 10 * data.DaySeconds);
         var spot = world.ThingsOf(ThingKind.LeafSpot).Single();
         Require(spot.OfTree == tree.Id, "the leaf spot should belong to the new adult tree");
@@ -266,7 +266,7 @@ public static class ReplantingChecks {
     private static void CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly(GameData data) {
         var world = EmptyWorld(data);
         var tree = PlantAnAcorn(world);
-        PourIntoTree(world, tree, Bucket.AtFill(5), Bucket.Item);
+        PourIntoTree(world, tree, Bucket.Item, 5, 0);
         float watered = world.Time;
         RunUntil(world, watered + data.DaySeconds * 2.5f);
         string saved = world.Serialize();

@@ -37,7 +37,7 @@ public static class InventoryChecks {
 
     private static void CheckEachToolTakesItsOwnSlot(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, "water", 3); Give(world, "steel_axe", 2);
+        GiveVessel(world, Water.Empty, Water.Liquid, 3, 3); Give(world, "steel_axe", 2);
         Require(world.Backpack.UsedSlots == 5, "each refillable bottle and each tool should take its own slot");
         var crate = world.NewCrate();
         Require(crate.Add("steel_pick", data.CrateCapacity) == data.CrateCapacity && crate.UsedSlots == data.CrateCapacity, "a crate should hold a full crate of single tools");

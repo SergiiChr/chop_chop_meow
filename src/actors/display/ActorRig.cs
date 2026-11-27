@@ -728,8 +728,10 @@ public sealed class ActorRig {
     }
 
     /// <summary>Places the vessel in the right fist and reaches for a rung or its opposite side with the left.</summary>
+    /// <param name="item">How the vessel looks, as <see cref="Vessels.LookOf"/> gives it.</param>
+    /// <param name="filled">Whether it holds some liquid, which shows in a bucket held upright.</param>
     internal Vector3 HoldWater(Pose pose, string item, Transform3D held, Vector3 right, Vector3? left = null,
-        Basis? bail = null, bool lit = false) {
+        Basis? bail = null, bool lit = false, bool filled = false) {
         bool isBucket = Bucket.Is(item);
         var vessel = isBucket ? bucket : bottle;
         var identity = Transform3D.Identity;
@@ -748,7 +750,7 @@ public sealed class ActorRig {
         if (isBucket && bucketWater != null && bucketBail != null) {
             var turn = bail ?? Basis.Identity;
             bucketBail.Transform = new Transform3D(turn, VesselShape.BucketHinge - turn * VesselShape.BucketHinge);
-            bucketWater.Visible = Bucket.Liters(item) > 0 && held.Basis.Y.Y > .85f;
+            bucketWater.Visible = filled && held.Basis.Y.Y > .85f;
         } else if (item != bottleItem) {
             BottleShape.SetGauge(vessel, item);
             bottleItem = item;

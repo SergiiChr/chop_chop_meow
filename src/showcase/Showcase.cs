@@ -119,11 +119,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var at = Terrain.Spawn;
         foreach (var t in world.Things.Where(t => t.Pos.DistanceTo(at) < 9).ToArray()) world.S.Things.Remove(t);
         var cabin = world.Add(ThingKind.Hut, at);
-        cabin.Inventory.Add(Barrel.AtFill(20), 1);
+        cabin.Inventory.Add(Vessels.Holding(Barrel.Item, world.S.NextId++, Barrel.Capacity, Water.Liquid, 20));
         var rack = world.Add(ThingKind.Toolstation, at + new Vector2(3.1f, -.8f));
         rack.Inventory.Add(Bucket.Item, 2);
         rack.Inventory.Add("steel_axe", 1);
-        rack.Inventory.Add(Water.Full, 1);
+        rack.Inventory.Add(Vessels.Holding(Water.Empty, world.S.NextId++, Water.Capacity, Water.Liquid, Water.Capacity));
         var barrel = world.Add(ThingKind.Barrel, at + new Vector2(.8f, 2.35f));
         barrel.Inventory.Add(Water.Liquid, 25);
         var pile = world.Add(ThingKind.Pile, at + new Vector2(-2.7f, 1.8f));
@@ -352,7 +352,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
         var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); world.SetFilter(chest, Inventory.Everything, false, true); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); anvil.Tools!.Add("steel_hammer", 1); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
-        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
+        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; for (int i = 0; i < 4; i++) world.S.Backpack.Add(Vessels.Holding(Water.Empty, world.S.NextId++, Water.Capacity, Water.Liquid, Water.Capacity)); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
         var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); world.SetFilter(rack, Inventory.Everything, false, true); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.LeafSpot, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeavesPerSpot);

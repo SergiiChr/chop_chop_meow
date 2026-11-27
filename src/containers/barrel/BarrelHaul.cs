@@ -23,7 +23,13 @@ internal sealed class BarrelHaul : PlaceHaul {
     internal static Vector2 FarmPourPoint(Thing farm, int stop) =>
         farm.ToWorld(FarmStands[stop] - FarmStands[stop].Normalized() * .55f);
 
-    public static bool Vessel(string item) => Bucket.Liters(item) >= 0 || Water.IsBottle(item);
+    public static bool Vessel(string item) => Bucket.Is(item) || Water.IsBottle(item);
+    /// <summary>The liters of water a worker's bucket or bottle holds: 0 for an empty one, -1 for one holding something else or no vessel.</summary>
+    private static int WaterLiters(Worker w) {
+        if (!Vessel(w.Tool)) return -1;
+        var vessel = w.ToolSlot.Object(w.Tool);
+        return vessel == null ? 0 : Vessels.LiquidIn(vessel) == Water.Liquid ? Vessels.LitersIn(vessel) : -1;
+    }
 
     public static bool OnLadderOrRoof(Worker w, Thing target) => target.Kind == ThingKind.Hut && w.WaterTarget == target.Id
         && w.WaterAction is WorkerWaterAction.ClimbUp or WorkerWaterAction.Pour or WorkerWaterAction.ClimbDown;
@@ -38,7 +44,7 @@ internal sealed class BarrelHaul : PlaceHaul {
     /// <summary>Fills the barrels of a haul job with water, carrying on a walk already started.</summary>
     internal bool Haul(Worker w, JobEntry job, float dt) {
         if (w.WaterWalk is { } walk && Vessel(w.Tool) && Hauling.Covers(job, walk.Target) && world.Find(walk.Target.Id) == walk.Target
-            && NeedsWater(walk.Target) && ToolFits(walk.Target, w.Tool) && ValidWalk(w, walk.Target, walk.Source)) {
+            && NeedsWater(walk.Target) && ToolFits(walk.Target, w) && ValidWalk(w, walk.Target, walk.Source)) {
             return Follow(w, walk.Target, walk.Source, walk.Stand, dt);
         }
         w.WaterWalk = null;
@@ -59,13 +65,13 @@ internal sealed class BarrelHaul : PlaceHaul {
         return false;
     }
 
-    private static bool ToolFits(Thing target, string item) => target.Kind == ThingKind.Farm ? Bucket.Liters(item) >= 0 : Vessel(item);
+    private static bool ToolFits(Thing target, Worker w) => WaterLiters(w) >= 0 && (target.Kind != ThingKind.Farm || Bucket.Is(w.Tool));
 
     private bool HaulFor(Worker w, Duty duty, float dt) {
         if (world.Find(duty.Thing) is not { Kind: ThingKind.Barrel or ThingKind.Hut or ThingKind.Farm } target || !NeedsWater(target)) return false;
         var stand = target.ToWorld(target.Kind == ThingKind.Farm ? FarmStands[0] : target.Kind == ThingKind.Hut ? LadderApproach : SpoutApproach);
         if (!world.CanStand(stand)) return Blocked(w);
-        if (!ToolFits(target, w.Tool)) {
+        if (!ToolFits(target, w)) {
             string need = target.Kind == ThingKind.Farm ? Bucket.Item : WaterTool;
             if (!world.StationsHold(need)) {
                 w.Status = target.Kind == ThingKind.Farm ? "Needs a steel bucket in the tool slot" : "Needs a bucket or bottle in the tool slot";
@@ -75,7 +81,7 @@ internal sealed class BarrelHaul : PlaceHaul {
             if (kit != World.Kit.Ready) return kit == World.Kit.Busy;
         }
         Thing? source = null;
-        if (NeedsFill(target, w.Tool)) {
+        if (NeedsFill(target, w)) {
             if (NearestWaterFor(w, target) is not (Thing from, Vector2 at)) { w.Status = "Needs an accessible lake shore or full barrel"; return false; }
             source = from; stand = at;
         }
@@ -83,11 +89,11 @@ internal sealed class BarrelHaul : PlaceHaul {
         return Follow(w, target, source, stand, dt);
     }
 
-    private bool NeedsFill(Thing target, string item) =>
-        target.Kind == ThingKind.Farm ? Bucket.Liters(item) < Bucket.Capacity : world.Data.VesselOf(item)!.LitersIn(item) == 0;
+    private static bool NeedsFill(Thing target, Worker w) =>
+        target.Kind == ThingKind.Farm ? WaterLiters(w) < Bucket.Capacity : WaterLiters(w) == 0;
 
     private bool ValidWalk(Worker w, Thing target, Thing? source) {
-        bool refill = NeedsFill(target, w.Tool);
+        bool refill = NeedsFill(target, w);
         return source == null ? !refill : refill && world.Find(source.Id) == source && GivesWater(source);
     }
 
@@ -182,7 +188,7 @@ internal sealed class BarrelHaul : PlaceHaul {
     }
 
     private bool WaterFarm(Worker w, Thing farm, float dt) {
-        int held = Bucket.Liters(w.Tool), room = world.Farms.WaterRoom(farm);
+        int held = WaterLiters(w), room = world.Farms.WaterRoom(farm);
         if (held <= 0 || room == 0 || farm.FarmStage != FarmStage.Growing || !World.HasDuty(w, farm.Id, JobKind.Haul)) return FinishFarm(w);
         if (w.ToolSlot.Free(w.Tool) == 0) { w.Status = "Waiting for the player to let go"; return true; }
         w.Status = "Watering the farm plot";
@@ -197,7 +203,7 @@ internal sealed class BarrelHaul : PlaceHaul {
         int stopsLeft = FarmStops - w.FarmWaterStop;
         int share = (held + stopsLeft - 1) / stopsLeft;
         int poured = farm.Inventory.Add(Water.Liquid, Math.Min(room, share));
-        w.Tool = Bucket.AtFill(held - poured);
+        world.SetFill(w.ToolSlot, w.Tool, Water.Liquid, held - poured);
         if (held == poured || ++w.FarmWaterStop == FarmStops) return FinishFarm(w);
         StartWater(w, WorkerWaterAction.WalkFarm, farm);
         return true;
@@ -217,16 +223,16 @@ internal sealed class BarrelHaul : PlaceHaul {
     }
 
     private void FillTool(Worker w, Thing source) {
-        if (world.Data.VesselOf(w.Tool) is not { Liquid: Water.Liquid } v || w.ToolSlot.Free(w.Tool) == 0) return;
-        int held = v.LitersIn(w.Tool);
-        int added = source.Kind == ThingKind.Water ? v.Capacity - held : Barrels.TakeWater(source, v.Capacity - held);
-        w.Tool = v.States[held + added];
+        int held = WaterLiters(w);
+        if (world.Data.VesselOf(w.Tool, Water.Liquid) is not VesselDef v || held < 0 || w.ToolSlot.Free(w.Tool) == 0) return;
+        int added = source.Kind == ThingKind.Water ? v.Capacity - held : barrels.TakeWater(source, v.Capacity - held);
+        world.SetFill(w.ToolSlot, w.Tool, Water.Liquid, held + added);
     }
 
     private void PourTool(Worker w, Thing target) {
-        if (world.Data.VesselOf(w.Tool) is not { Liquid: Water.Liquid } v || w.ToolSlot.Free(w.Tool) == 0) return;
-        int held = v.LitersIn(w.Tool);
+        int held = WaterLiters(w);
+        if (held <= 0 || w.ToolSlot.Free(w.Tool) == 0) return;
         int poured = barrels.AddWater(target, held);
-        w.Tool = v.States[held - poured];
+        world.SetFill(w.ToolSlot, w.Tool, Water.Liquid, held - poured);
     }
 }

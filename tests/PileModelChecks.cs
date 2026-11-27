@@ -117,7 +117,7 @@ public static class PileModelChecks {
         var blue = new Color("43b9e6");
         var jamColor = new Color("9b2f4f");
         for (int liters = 1; liters <= Water.Capacity; liters++) {
-            string waterItem = Water.WaterItem(liters), jamItem = BerryJam.Bottles[liters];
+            string waterItem = Water.Looks[liters], jamItem = BerryJam.Looks[liters];
             var water = WorldModels.IconModel(waterItem, false, data);
             var jam = WorldModels.IconModel(jamItem, false, data);
             try {
@@ -130,8 +130,9 @@ public static class PileModelChecks {
                 Require(Marks(waterParts, blue) == liters && Marks(jamParts, jamColor) == liters,
                     $"each icon should show {liters} marks in its own liquid's color");
 
-                var waterPiece = PileShape.HeapOf(waterItem, data.Items[waterItem].Color).Mesh;
-                var jamPiece = PileShape.HeapOf(jamItem, data.Items[jamItem].Color).Mesh;
+                // A pile tints a look the game has no item for, such as a part-full bottle, in the fallback color.
+                var waterPiece = PileShape.HeapOf(waterItem, data.Items.TryGetValue(waterItem, out var waterDef) ? waterDef.Color : PileShape.Fallback).Mesh;
+                var jamPiece = PileShape.HeapOf(jamItem, data.Items.TryGetValue(jamItem, out var jamDef) ? jamDef.Color : PileShape.Fallback).Mesh;
                 Require(waterPiece.GetFaces().SequenceEqual(jamPiece.GetFaces()),
                     "water and jam in a pile must be heaped as the same flask");
                 int Colored(Mesh piece, Color color) => piece.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Color].AsColorArray()

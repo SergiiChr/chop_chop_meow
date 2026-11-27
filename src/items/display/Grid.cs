@@ -88,7 +88,7 @@ public partial class PagePanel {
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(held, item) : -1, World.IsPacked(item) ? held.Object(item)?.Contents?.Count ?? 0 : 0)
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(held, item) : -1, held.Object(item)?.Contents?.Count ?? 0)
                     : ((string?)null, 0, 0, false, -1, -1, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
@@ -103,14 +103,15 @@ public partial class PagePanel {
         });
         return grid;
         void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life, int bugs) {
-            cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
-            var contents = stack is (string crate, _) && World.IsPacked(crate) ? held.Object(crate)?.Contents : null;
+            var unit = stack is (string id, _) ? held.Object(id) : null;
+            cell.Icon = stack is (string shows, _) ? Icons.Of(Vessels.LookOf(world.Data, held, shows)) : null;
+            var contents = stack is (string crate, _) && World.IsPacked(crate) ? unit?.Contents : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            if (stack is (string barrel, 1) && Barrel.Is(barrel)) count.SetCount($"{Barrel.Liters(barrel)}/{Barrel.Capacity} L");
+            if (stack is (string barrel, 1) && Barrel.Is(barrel)) count.SetCount($"{Barrel.Liters(unit)}/{Barrel.Capacity} L");
             else if (stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel)
-                count.SetCount($"{vessel.LitersIn(bottle)}/{vessel.Capacity}");
+                count.SetCount($"{Vessels.LitersIn(unit)}/{vessel.Capacity}");
             else if (contents != null) count.SetCount(contents.Count.ToString());
             else count.SetStack(stack?.Count ?? 0, bugs);
             bool takes = wanted != null && stack is (string item, _) && wanted(item);

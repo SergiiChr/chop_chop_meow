@@ -68,13 +68,13 @@ public static class WolfChecks {
             SetNeeds(world, health: 1);
             if (cause == "hunger") SetNeeds(world, hunger: 0); else SetNeeds(world, thirst: 0);
             Give(world, "berries", 2);
-            Give(world, "water", 1);
+            GiveVessel(world, Water.Empty, Water.Liquid, 3, 1);
             world.Tick(1);
             var recovery = world.Things.LastOrDefault(t => t.Kind == ThingKind.Grave);
             Require(recovery != null, $"{cause} death should leave a recovery box");
             Require(recovery.Pos == new Vector2(12, 13), $"{cause} death should leave the recovery box at the collapse location");
             Require(recovery.Inventory["berries"] == 2, $"{cause} death should recover the player's carried berries");
-            Require(recovery.Inventory["water"] == 1, $"{cause} death should recover the player's carried water");
+            Require(Vessels.Count(recovery.Inventory, Water.Empty, Water.Liquid, 3) == 1, $"{cause} death should recover the player's carried water");
             SafeTick(world, data.RespawnSeconds + .1f);
             Require(world.Player == Terrain.Spawn && world.Health == 100,
                     $"{cause} death should respawn the player in a healthy state");
@@ -148,8 +148,9 @@ public static class WolfChecks {
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {
         var maul = NightWorld(data);
         SetNeeds(maul, health: 49);
-        foreach (var (item, count) in new[] { ("berries", 3), ("burnt_steak", 2), ("raw_meat", 1), ("water", 2), ("steel_axe", 1), ("wood", 4) })
+        foreach (var (item, count) in new[] { ("berries", 3), ("burnt_steak", 2), ("raw_meat", 1), ("steel_axe", 1), ("wood", 4) })
             Give(maul, item, count);
+        GiveWater(maul, count: 2);
         var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0) };
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
         PlaceWolf(maul, leaper); PlaceWolf(maul, packmate);
@@ -181,7 +182,7 @@ public static class WolfChecks {
         Require(box.Inventory["berries"] == 0, "a wolf kill should leave no berries in the recovery box");
         Require(box.Inventory["burnt_steak"] == 0, "a wolf kill should leave no steak in the recovery box");
         Require(box.Inventory["raw_meat"] == 0, "a wolf kill should leave no raw meat in the recovery box");
-        Require(box.Inventory["water"] == 2, "a wolf kill should keep water in the recovery box");
+        Require(Vessels.Count(box.Inventory, Water.Empty, Water.Liquid, 3) == 2, "a wolf kill should keep water in the recovery box");
         Require(box.Inventory["steel_axe"] == 1, "a wolf kill should keep tools in the recovery box");
         Require(box.Inventory["wood"] == 4, "a wolf kill should keep wood in the recovery box");
         SafeTick(maul, data.RespawnSeconds);
@@ -196,14 +197,14 @@ public static class WolfChecks {
         var world = TorchNight(data);
         SetNeeds(world, health: 5);
         Give(world, "berries", 3); Give(world, "wood", 4);
-        Give(world, BerryJam.Bottle); Give(world, BerryJam.Bottles[1]);
+        GiveVessel(world, Water.Empty, BerryJam.Liquid, 3); GiveVessel(world, Water.Empty, BerryJam.Liquid, 1);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         for (int i = 0; i < 30 && !world.Dead; i++) world.Tick(.1f);
         Require(world.Dead && !world.Mauled, "a wolf's bite should kill a player on 5 health without pinning them");
         var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
         Require(box.Inventory["berries"] == 0, "a wolf that bites a player to death should eat their berries");
         Require(box.Inventory["wood"] == 4, "a wolf that bites a player to death should leave the rest in the recovery box");
-        Require(box.Inventory[BerryJam.Bottle] == 0 && box.Inventory[BerryJam.Bottles[1]] == 0,
+        Require(Vessels.Count(box.Inventory, Water.Empty, BerryJam.Liquid, 3) == 0 && Vessels.Count(box.Inventory, Water.Empty, BerryJam.Liquid, 1) == 0,
             "wolves should eat all the jam in the recovery box");
         Require(box.Inventory[Water.Empty] == 2, "wolves should leave a bottle for each full or partly full jam bottle they emptied");
     }

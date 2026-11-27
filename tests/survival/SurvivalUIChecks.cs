@@ -106,17 +106,17 @@ public partial class Game {
     private async Task CheckPartDrunkBottlePoursItsLitersIntoTheWaterInputSlot() {
         await CloseWithEsc();
         EmptyBackpack(Hosted);
-        Give(Hosted, Water.TwoLiters, 1);
+        string twoLiters = GiveVessel(Hosted, Water.Empty, Water.Liquid, 2);
         var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         Hosted.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
-        await Holding(Key.Shift, () => Click(BagCellOf(Water.TwoLiters)));
+        await Holding(Key.Shift, () => Click(BagCellOf(twoLiters)));
         await Until(() => table.Inventory[Water.Liquid] == 2, "Shift on a two-liter bottle pouring two liters of water", 2);
-        Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.TwoLiters] == 0, "The poured bottle must stay in the backpack, empty.");
-        Give(Hosted, Water.OneLiter, 1); await Frames(2);
-        await Carry(BagCellOf(Water.OneLiter), (Control)ui.FindChild($"input_{Water.Liquid}", true, false));
+        Require(world.Backpack[Water.Empty] == 1 && Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 2) == 0, "The poured bottle must stay in the backpack, empty.");
+        string oneLiter = GiveVessel(Hosted, Water.Empty, Water.Liquid, 1); await Frames(2);
+        await Carry(BagCellOf(oneLiter), (Control)ui.FindChild($"input_{Water.Liquid}", true, false));
         await Until(() => table.Inventory[Water.Liquid] == 3, "a one-liter bottle put on the water input slot pouring its liter", 2);
-        Require(world.Backpack[Water.Empty] == 2 && table.Inventory[Water.OneLiter] + table.Inventory[Water.Empty] == 0, "A bottle put on the input slot must pour and stay in the backpack, empty.");
+        Require(world.Backpack[Water.Empty] == 2 && Vessels.Count(table.Inventory, Water.Empty, Water.Liquid, 1) + table.Inventory[Water.Empty] == 0, "A bottle put on the input slot must pour and stay in the backpack, empty.");
         await SurvivalReviewShot("water-pour");
     }
     /// <summary>Shift on a station's water with no bottle with room in the backpack is refused, says why and shakes the input slot; with one it takes a liter into it.</summary>
@@ -134,7 +134,7 @@ public partial class Game {
         await Until(() => !slot.Shaking, "the water input slot coming to rest", 2);
         Give(Hosted, Water.Empty, 1); await Frames(2);
         await Holding(Key.Shift, () => Click(slot));
-        await Until(() => world.Backpack[Water.OneLiter] == 1, "Shift on the water input slot taking one liter into the empty bottle", 2);
+        await Until(() => Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 1) == 1, "Shift on the water input slot taking one liter into the empty bottle", 2);
         Require(table.Inventory[Water.Liquid] == 0 && world.Backpack[Water.Empty] == 0, "The water must leave the table in the bottle.");
         RemoveThings(Hosted, t => t == table); EmptyBackpack(Hosted); await CloseWithEsc();
     }

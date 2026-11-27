@@ -447,6 +447,7 @@ public sealed partial class World {
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
     private readonly Barrels barrels;
+    internal Barrels Barrels => barrels;
 
     private readonly BarrelHaul barrelHaul;
     // The jobs several kinds of place offer, and the places' own versions of them: the lake's gathering and the packing station's crafting.
@@ -610,11 +611,7 @@ public sealed partial class World {
         if (HadItself(item)) return true;
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
         if (Data.VesselFor(item) == null) return false;
-        foreach (var vessel in Data.Vessels) {
-            if (vessel.Liquid != item) continue;
-            for (int fill = 1; fill < vessel.States.Count; fill++)
-                if (HadItself(vessel.States[fill])) return true;
-        }
+        foreach (var (id, def) in Data.Items) if (def.FullOf == item && HadItself(id)) return true;
         return false;
     }
     /// <summary>Whether the settlement has had this item itself.</summary>
@@ -827,7 +824,7 @@ public sealed partial class World {
         return n >= 0 && n < Numbers.Length ? Numbers[n] : n.ToString();
     }
     /// <summary>The kind of tool an item counts as in a worker's slot and on the tool rack.</summary>
-    public string ToolKind(string item) => ContainerItem.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(item)?.Tool ?? "";
+    public string ToolKind(string item) => Water.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(Item.KindOf(item))?.Tool ?? "";
 
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) => BestTool(tool, from ?? S.Backpack, tier, requireFree: false);
@@ -850,7 +847,7 @@ public sealed partial class World {
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
     public bool CanSprint => Barrel.In(S.Backpack) == null;
-    public float PlayerSpeed => (Barrel.FilledIn(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(barrel)
+    public float PlayerSpeed => (Barrel.FilledIn(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(S.Backpack.Object(barrel))
         : Data.MoveSpeed(S.Actor.Sprinting && CanSprint)) * GravelPaths.SpeedAt(Player);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
@@ -860,7 +857,7 @@ public sealed partial class World {
         Player = Slide(Player, delta);
     }
     public string? GatherBlock(Thing t, bool worker = false) {
-        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
+        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == null && Vessels.Count(S.Backpack, Water.Empty, Water.Liquid, Water.Capacity) > 0 && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
         if (t.Kind == ThingKind.Mine) return Mines.BuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (worker && TreePlanting.IsYoung(t)) return "Woodcutters wait for adult trees.";
@@ -978,17 +975,24 @@ public sealed partial class World {
         return false;
     }
     public void Consume(string item) {
-        if (!Data.Items.TryGetValue(item, out var def) || Busy() || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
-        if (Water.IsBottle(item)) {
-            if (!Water.DrinkLiter(this, item)) Say("Your bottle is empty. Collect water at the lake to refill it.");
-            return;
-        }
+        if (!Data.HasItem(item) || Data.Items.GetValueOrDefault(item)?.FullOf != null || Busy() || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
+        if (Water.IsBottle(item)) { EatFromBottle(item); return; }
+        var def = Data.Items[item];
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
-        int jam = BerryJam.BottleLiters(item);
-        bool eaten = jam > 0 ? S.Backpack.ReplaceOne(item, BerryJam.Bottles[jam - 1]) : S.Backpack.Remove(item, 1) > 0;
-        if (!eaten) { Say($"No {def.Name} in your backpack."); return; }
+        if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
         S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst);
         if (def.Food) Play("eat_berry", Player);
+    }
+    /// <summary>Drinks or eats one liter of what a bottle holds, which stays in its cell, emptier.</summary>
+    private void EatFromBottle(string bottle) {
+        var unit = S.Backpack.Object(bottle);
+        if (Vessels.LiquidIn(unit) is not string liquid || Data.VesselOf(bottle, liquid) is not VesselDef v || v.Hunger <= 0 && v.Thirst <= 0) {
+            Say("Your bottle is empty. Collect water at the lake to refill it.");
+            return;
+        }
+        if (SetFill(S.Backpack, bottle, liquid, Vessels.LitersIn(unit) - 1) == null) return;
+        S.Hunger = Math.Min(100, S.Hunger + v.Hunger); S.Thirst = Math.Min(100, S.Thirst + v.Thirst);
+        if (v.Hunger > 0) Play("eat_berry", Player);
     }
     public void Pump(Thing t) {
         if (t.Kind is not (ThingKind.Reinforced or ThingKind.Pump) || !AtStation(t) || Busy() || Forwarded(Verb.Pump, t.Id)) return;
@@ -1255,7 +1259,7 @@ public sealed partial class World {
     /// <summary>The refusal for an item a station's recipe neither uses nor makes.</summary>
     private string NotUsedHere(string item) => $"{Data.Name(item)} is not used by what this station makes.";
     /// <summary>Whether a station's input slots take an item: an input of the recipe it is on or keeps to, or a vessel holding a liquid input.</summary>
-    private bool LoadsInto(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null;
+    private bool LoadsInto(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item, S.Backpack.Object(item)) != null;
     /// <summary>Whether a hand move puts an item into a station's slots: what its input slots take, or what its recipe makes.</summary>
     private bool SlotsTake(Thing t, string item) => LoadsInto(t, item) || IsProduct(Product(t), item);
     /// <summary>Whether a station takes an item from the player: what its input slots take, or a fuel it burns.</summary>
@@ -1287,7 +1291,7 @@ public sealed partial class World {
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if ((t.Kind == ThingKind.Packer || Barrel.Is(item)) && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
         // A vessel pours what it holds into the station's input slot for its liquid.
-        var vessel = PoursInto(t, t.Inventory, item);
+        var vessel = PoursInto(t, t.Inventory, item, S.Backpack.Object(item));
         string lands = vessel?.Liquid ?? item;
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say(NotUsedHere(item)); return 0; }
         if (Busy() || Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
@@ -1302,7 +1306,7 @@ public sealed partial class World {
     /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
     /// </summary>
     private int Load(Thing t, string item, int quantity) =>
-        Carry(S.Backpack, t.Inventory, t, item, quantity, t.Inventory.SlotRoom(PoursInto(t, t.Inventory, item)?.Liquid ?? item));
+        Carry(S.Backpack, t.Inventory, t, item, quantity, t.Inventory.SlotRoom(PoursInto(t, t.Inventory, item, S.Backpack.Object(item))?.Liquid ?? item));
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
@@ -1473,7 +1477,7 @@ public sealed partial class World {
         Doorways.UnlockEmpty(cabin);
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
-        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) SpendContents(box.Inventory, item, box.Inventory[item]);
+        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(id => IsFood(box.Inventory, id)).ToArray()) SpendContents(box.Inventory, item, box.Inventory[item]);
         const string ate = "Wolves ate food in your backpack.";
         // A pack that pinned the player stays to feed until they respawn.
         if (S.Mauled) { Say(ate); return; }
@@ -1648,23 +1652,37 @@ public sealed partial class World {
     /// <summary>Whether a filter entry from <see cref="CrateOf"/> or <see cref="MixedCrate"/> stands for crates of this good, compared without building the entry.</summary>
     internal static bool NamesCrateOf(string entry, string good) =>
         entry.Length == PackedPrefix.Length + good.Length && entry.StartsWith(PackedPrefix, StringComparison.Ordinal) && entry.EndsWith(good, StringComparison.Ordinal);
+    /// <summary>The filter entry that stands for a bottle, bucket or barrel holding a liquid at any fill, such as <c>steel_bucket+fresh_water</c>.</summary>
+    public static string HoldingOf(string container, string liquid) => container + HoldingMark + liquid;
+    private const char HoldingMark = '+';
+    /// <summary>The container and liquid an entry from <see cref="HoldingOf"/> names, or null for any other entry.</summary>
+    public (string Container, string Liquid)? HoldingIn(string entry) {
+        int at = entry.IndexOf(HoldingMark);
+        if (at <= 0) return null;
+        string container = entry[..at], liquid = entry[(at + 1)..];
+        return IsContainer(container) && Data.VesselFor(liquid) != null ? (container, liquid) : null;
+    }
+    /// <summary>Whether an item id is a bottle, bucket or barrel, which holds a liquid as an object and is plain when empty.</summary>
+    public static bool IsContainer(string kind) => kind != Crate && Array.IndexOf(Item.Holders, kind) >= 0;
+    /// <summary>The container an object is and the liquid it holds, for a bottle, bucket or barrel holding some; null for anything else.</summary>
+    internal static (string Container, string Liquid)? Holding(Item? unit) =>
+        unit != null && IsContainer(unit.Kind) && Vessels.LiquidIn(unit) is string liquid ? (unit.Kind, liquid) : null;
+    /// <summary>Whether a filter entry from <see cref="HoldingOf"/> stands for this container holding this liquid, compared without building the entry.</summary>
+    internal static bool NamesHolding(string entry, string container, string liquid) =>
+        entry.Length == container.Length + 1 + liquid.Length && entry[container.Length] == HoldingMark
+        && entry.StartsWith(container, StringComparison.Ordinal) && entry.EndsWith(liquid, StringComparison.Ordinal);
+    /// <summary>Every <see cref="HoldingOf"/> entry: each bottle and bucket with each liquid it can hold, and barrels with every liquid.</summary>
+    public List<string> HoldingEntries => holdingEntries ??= Data.Vessels.Select(v => HoldingOf(v.Empty, v.Liquid))
+        .Concat(Data.Vessels.Select(v => v.Liquid).Distinct().Select(liquid => HoldingOf(Barrel.Item, liquid))).Distinct().ToList();
+    private List<string>? holdingEntries;
     /// <summary>The good a filter entry from <see cref="CrateOf"/> asks crates of, or null for any other entry.</summary>
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
     /// <summary>
-    /// What a pile's filter names for an item: the kind of crate for a packed crate, a vessel's liquid for a vessel holding some,
-    /// or the item itself, a <see cref="CrateOf"/> entry included.
+    /// What a pile's filter names for an item: the kind of crate for a packed crate, the kind of an object such as a lantern or a
+    /// filled bucket, or the item itself, a <see cref="CrateOf"/> entry included.
     /// </summary>
     /// <param name="unit">The object the item's key finds, for a packed crate.</param>
-    public string PileEntry(string item, Item? unit = null) {
-        string kindOfContainer = ContainerItem.Base(item);
-        if (kindOfContainer is Barrel.Item or Bucket.Item or Lanterns.Item) return kindOfContainer;
-        if (CrateGood(item) != null) return item;
-        if (PackedGood(unit) is string good) return good == "" ? MixedCrate : CrateOf(good);
-        return Data.VesselOf(item) is VesselDef v && item != v.Empty ? v.Liquid : item;
-    }
-    /// <summary>The items a pile's filter lists for a <see cref="PileEntry"/>: every fill of a vessel that holds its liquid, or the entry itself.</summary>
-    private IEnumerable<string> PileItems(string entry) => entry == Barrel.Item ? Barrel.Fills.Concat(BerryJam.Barrels.Skip(1)) : entry == Bucket.Item ? Bucket.Fills.Concat(BerryJam.Buckets.Skip(1))
-        : Data.VesselFor(entry) is VesselDef v ? v.States.Skip(1) : new[] { entry };
+    public string PileEntry(string item, Item? unit = null) => FilterEntry(item, unit) is var entry && entry != item ? entry : CrateGood(item) != null ? item : Item.KindOf(item);
     /// <summary>The <see cref="PileEntry"/> a pile's filter names, or null while it names none.</summary>
     public string? PileFilter(Thing pile) {
         foreach (string item in pile.Inventory.InputFilter) return PileEntry(item);
@@ -1675,9 +1693,12 @@ public sealed partial class World {
     public static bool IsSingleResourceStore(Thing t) => IsPlainPile(t) || t.Kind == ThingKind.Barrel;
     /// <summary>The filter entry an item stands under: the kind of crate for a packed crate, or the item itself.</summary>
     /// <param name="unit">The object the item's key finds, for a packed crate.</param>
-    public static string FilterEntry(string item, Item? unit) => PackedGood(unit) is string good ? good == "" ? MixedCrate : CrateOf(good) : item;
+    public static string FilterEntry(string item, Item? unit) =>
+        PackedGood(unit) is string good ? good == "" ? MixedCrate : CrateOf(good) : Holding(unit) is var (container, liquid) ? HoldingOf(container, liquid) : item;
     /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
-    public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good))) : Data.Name(entry);
+    public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good)))
+        : HoldingIn(entry) is var (container, liquid) ? Phrase(Data.NameOnMap(container), " of ", Lower(Data.Name(liquid)))
+        : IsContainer(entry) && !Data.Name(entry).StartsWith("Empty", StringComparison.Ordinal) ? Phrase("Empty ", Lower(Data.Name(entry))) : Data.Name(entry);
     /// <summary>
     /// The goods in a packed crate, wherever in the world it is, or null for anything else.
     /// It looks through every box, so code that knows the box holding the crate asks that box instead.
@@ -1707,8 +1728,11 @@ public sealed partial class World {
     /// <param name="box">The box holding it, where an object such as a crate or a lantern keeps what it says of itself.</param>
     public string Describe(string item, Inventory? box = null) {
         var unit = box?.Object(item);
-        return IsPacked(item) && (unit?.Contents ?? Packed(item)) is Inventory contents ? $"{Data.Name(Crate)} of {Goods(contents.Items)}"
-            : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(unit)) : Data.Name(item);
+        if (IsPacked(item) && (unit?.Contents ?? Packed(item)) is Inventory contents) return $"{Data.Name(Crate)} of {Goods(contents.Items)}";
+        if (Lanterns.IsItem(item)) return Lanterns.Name(Lanterns.BugCount(unit));
+        if (Vessels.LiquidIn(unit) is string liquid)
+            return Barrel.Is(item) ? Barrel.Name(Vessels.LitersIn(unit), liquid, Data) : Data.VesselOf(item, liquid)?.Name(Vessels.LitersIn(unit), Data) ?? Data.Name(item);
+        return Data.Name(item);
     }
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
@@ -1782,18 +1806,22 @@ public sealed partial class World {
         return barrels.Place(item, at, MarkedSource ?? S.Backpack, rotation);
     }
 
+    /// <summary>A filled barrel's key as checks of room and of the one filled barrel a player carries see it.</summary>
+    private static readonly string AnyFilledBarrel = Item.KeyOf(Barrel.Item, 0);
     private static string? CarryBarrelBlock(Inventory backpack, string item) =>
         Barrel.IsFilled(item) && Barrel.FilledIn(backpack) != null ? "You can only carry one filled barrel." : null;
 
     public bool PickUpBarrel(Thing barrel) {
         if (barrel.Kind != ThingKind.Barrel || !Near(barrel) || Find(barrel.Id) != barrel) return false;
         string liquid = Barrels.LiquidIn(barrel);
-        string item = Barrel.AtFill(barrel.Inventory[liquid], liquid);
+        int liters = barrel.Inventory[liquid];
+        string item = liters > 0 ? AnyFilledBarrel : Barrel.Item;
         if (CarryBarrelBlock(S.Backpack, item) is string blocked) { Say(blocked); return false; }
         if (S.Backpack.Room(item) == 0) { Say("Backpack full. Make room for the barrel."); return false; }
         if (Busy() || Forwarded(Verb.PickUpBarrel, barrel.Id)) return true;
         if (HeldByOthers(barrel)) return false;
-        S.Backpack.Add(item, 1);
+        if (liters > 0) S.Backpack.Add(Vessels.Holding(Barrel.Item, S.NextId++, Barrel.Capacity, liquid, liters));
+        else S.Backpack.Add(Barrel.Item, 1);
         if (barrel.PlumbingSlot is Inventory plumbingSlot && plumbingSlot.Count > 0)
             Construction.GiveBack(new Dictionary<string, int> { [Plumbing.InstallMaterial] = plumbingSlot[Plumbing.InstallMaterial] }, barrel.Pos);
         S.Things.Remove(barrel);
@@ -1804,35 +1832,40 @@ public sealed partial class World {
 
     /// <summary>Pours into one barrel in the named backpack cell, or draws water into carried vessels.</summary>
     public int MoveInBarrel(string barrelItem, string item, int quantity, bool puttingIn, int barrelSlot = -1) {
-        int before = Barrel.Liters(barrelItem);
-        if (before < 0 || quantity <= 0) return 0;
         var backpack = S.Backpack;
+        if (!Barrel.Is(barrelItem) || quantity <= 0) return 0;
+        var held = backpack.Object(barrelItem);
+        int before = Barrel.Liters(held);
         if (barrelSlot == -1) barrelSlot = backpack.Layout.FindIndex(cell => cell.Item == barrelItem && cell.Held == 0);
         if ((uint)barrelSlot >= (uint)Math.Min(backpack.Layout.Count, backpack.Slots)) return 0;
         var barrel = backpack.Layout[barrelSlot];
         if (barrel.Item != barrelItem || barrel.Held > 0) return 0;
-        string? liquid = puttingIn ? Barrels.PouredLiquid(Data, item) : item;
+        string? liquid = puttingIn ? Barrels.PouredLiquid(Data, item, backpack.Object(item)) : item;
         if (liquid == null || Data.VesselFor(liquid) == null) return 0;
-        if (before > 0 && Barrel.LiquidOf(barrelItem) != liquid) {
+        if (before > 0 && Barrel.LiquidOf(held) != liquid) {
             Say("Different liquids cannot share a barrel.");
             return 0;
         }
         if (puttingIn && before == 0) {
-            if (CarryBarrelBlock(backpack, Barrel.AtFill(1)) is string blocked) { Say(blocked); return 0; }
-            if (!backpack.CanSplitBarrelStack(barrelSlot)) { Say("Make room in your backpack to fill a barrel."); return 0; }
+            if (CarryBarrelBlock(backpack, AnyFilledBarrel) is string blocked) { Say(blocked); return 0; }
+            if (!backpack.RoomForRest(barrelSlot)) { Say("Make room in your backpack to fill a barrel."); return 0; }
         }
-        if (Busy() || Forwarded(Verb.MoveInBarrel, before + (Barrel.LiquidOf(barrelItem) == BerryJam.Liquid ? Barrel.Capacity : 0), puttingIn ? 1 : 0, item, quantity, new Vector2(backpack.PreferredSlot, barrelSlot))) return 0;
+        if (Busy() || Forwarded(Verb.MoveInBarrel, Item.IdOf(barrelItem), puttingIn ? 1 : 0, item, quantity, new Vector2(backpack.PreferredSlot, barrelSlot))) return 0;
         var tank = Barrels.NewTank();
         tank.Add(liquid, before);
         if (puttingIn) {
             if (Data.VesselOf(item) is not VesselDef vessel) return 0;
-            PourVessels(S.Backpack, item, tank, vessel, MarkedSource == S.Backpack ? Math.Min(quantity, heldCount) : quantity, tank.Room(liquid));
+            PourVessel(S.Backpack, item, tank, vessel, tank.Room(liquid));
         } else {
             if (FillBlock(tank, S.Backpack, item) is string dry) { Say(dry); return 0; }
             Carry(tank, S.Backpack, null, item, quantity);
         }
         int after = tank[liquid];
-        if (before != after) backpack.SetBarrelFill(barrelSlot, Barrel.AtFill(after, liquid));
+        if (before != after) {
+            int preferred = backpack.PreferredSlot;
+            backpack.PreferredSlot = barrelSlot;
+            try { SetFill(backpack, barrelItem, liquid, after, keepCell: true); } finally { backpack.PreferredSlot = preferred; }
+        }
         if (before == after && puttingIn && tank.Room(liquid) == 0) Say("The barrel is full.");
         return Math.Abs(after - before);
     }
@@ -1992,7 +2025,7 @@ public sealed partial class World {
             box.Inventory.CarriedBy = Inventory.Carrier.None;
             box.Inventory.Capacity = 0;
             box.Inventory.Slots = box.Inventory.UsedSlots + 1;
-            box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1);
+            if (w.Tool != "") w.ToolSlot.TransferTo(box.Inventory, w.Tool, 1);
         }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
@@ -2000,19 +2033,19 @@ public sealed partial class World {
     /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools, buckets and bottles, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item, Item? unit = null) => t.Kind switch {
         ThingKind.Tree => TreePlanting.NeedsWater(t)
-            ? (Barrels.CanPourWater(Data, item) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,
+            ? (Barrels.CanPourWater(Data, item, unit) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,
         ThingKind.Hole when item != TreePlanting.Acorn => HoldRefusal.AcornsOnly,
-        ThingKind.Hut when Barrel.Is(item) && Barrel.LiquidOf(item) == Water.Liquid => HoldRefusal.None,
+        ThingKind.Hut when Barrel.Is(item) && Barrel.LiquidOf(unit) == Water.Liquid => HoldRefusal.None,
         // A station's output slot takes back the barrels it makes; nothing else but a pile holds one.
         _ when Barrel.Is(item) && !(IsStation(t.Kind) && SlotsTake(t, item)) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,
-        ThingKind.Barrel when Barrels.Accepts(Data, t, item) => HoldRefusal.None,
+        ThingKind.Barrel when Barrels.Accepts(Data, t, item, unit) => HoldRefusal.None,
         ThingKind.Barrel => HoldRefusal.LiquidOnly,
         ThingKind.Hut => HoldRefusal.BarrelOnly,
         ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
         _ when IsStation(t.Kind) && !SlotsTake(t, item) => HoldRefusal.NotUsed,
-        ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
+        ThingKind.Pile when t.Compost && !Compostable(item, unit) && item != "fertilizer" => HoldRefusal.CompostOnly,
         ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item, unit) => HoldRefusal.OtherResource,
-        ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) && !Barrels.CanPourWater(Data, item) => HoldRefusal.FarmOnly,
+        ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) && !Barrels.CanPourWater(Data, item, unit) => HoldRefusal.FarmOnly,
         ThingKind.Packer when item != "crate" && !IsProduct(t.Packs, item) => HoldRefusal.PackerOnly,
         ThingKind.Signpost when !CanSell(item) => HoldRefusal.SellOnly,
         ThingKind.Campfire when item != "wood" => HoldRefusal.WoodOnly,
@@ -2048,7 +2081,13 @@ public sealed partial class World {
     }
     /// <summary>The resource a plain pile is for, in lower case, as its filter names it or, until the next tick sets the filter, as it holds it.</summary>
     public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held, pile.Inventory.Object(held)) : null)) is string entry ? Lower(FilterName(entry)) : null;
-    public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
+    /// <summary>The first item in a box that rots in compost; ticks look, so it allocates nothing.</summary>
+    private string FirstCompostable(Inventory box) {
+        foreach (var (item, _) in box.Items) if (Compostable(item, box.Object(item))) return item;
+        throw new InvalidOperationException("Compost turned with nothing in it that rots.");
+    }
+    /// <param name="unit">The object the item's key finds in its box, for a vessel holding something eaten, such as a bottle of jam.</param>
+    public bool Compostable(string item, Item? unit = null) => item is "leaves" or "grass" || Data.IsFood(item) || FoodVessel(item, unit);
     /// <summary>Turns a pile into compost or back; refused while it holds something the new use would not take.</summary>
     public bool SetCompost(Thing pile, bool on) {
         if (pile.Kind != ThingKind.Pile || pile.Compost == on) return false;
@@ -2058,7 +2097,11 @@ public sealed partial class World {
         pile.Compost = on; pile.Progress = 0;
         // Compost starts out taking everything that rots and giving fertilizer; its filters are then the player's to change.
         pile.Inventory.InputFilter.Clear(); pile.Inventory.OutputFilter.Clear();
-        if (on) { foreach (var item in compostables ??= Data.Items.Keys.Where(Compostable).ToArray()) pile.Inventory.InputFilter.Add(item); pile.Inventory.OutputFilter.Add("fertilizer"); }
+        if (on) {
+            compostables ??= Data.Items.Keys.Where(id => Compostable(id)).Concat(Data.Vessels.Where(v => v.Hunger > 0).Select(v => HoldingOf(v.Empty, v.Liquid))).ToArray();
+            foreach (var item in compostables) pile.Inventory.InputFilter.Add(item);
+            pile.Inventory.OutputFilter.Add("fertilizer");
+        }
         PileFilters(pile); return true;
     }
     private string[]? compostables;
@@ -2067,25 +2110,25 @@ public sealed partial class World {
         if (pile.Compost || pile.Inventory.InputFilter.Count > 0 || pile.Inventory.First() is not string item) return;
         SetPileFilter(pile, PileEntry(item, pile.Inventory.Object(item)));
     }
-    /// <summary>Makes a pile's filters, in and out, name the items of one <see cref="PileEntry"/>.</summary>
-    private void SetPileFilter(Thing thing, string entry) {
+    /// <summary>Makes a pile's filters, in and out, name one <see cref="PileEntry"/>.</summary>
+    private static void SetPileFilter(Thing thing, string entry) {
         var pile = thing.Inventory;
         pile.InputFilter.Clear(); pile.OutputFilter.Clear();
-        foreach (string item in thing.Kind == ThingKind.Barrel ? new[] { entry } : PileItems(entry)) { pile.InputFilter.Add(item); pile.OutputFilter.Add(item); }
+        pile.InputFilter.Add(entry); pile.OutputFilter.Add(entry);
         pile.Changed?.Invoke();
     }
     /// <summary>Compost turns 4 units of whatever it holds into 1 fertilizer each in-game hour.</summary>
     public const int CompostBatch = 4;
     private void CompostTick(Thing pile, float dt) {
         int rotting = 0;
-        foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key)) rotting += pair.Value;
+        foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key, pile.Inventory.Object(pair.Key))) rotting += pair.Value;
         if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
         // Like a station, compost holding a stack a player picked up makes nothing until it is let go of.
         if (HeldAt(pile)) return;
         pile.Progress += dt;
         if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
-        for (int left = CompostBatch; left > 0;) left -= SpendContents(pile.Inventory, pile.Inventory.Items.Keys.First(Compostable), left);
+        for (int left = CompostBatch; left > 0;) left -= SpendContents(pile.Inventory, FirstCompostable(pile.Inventory), left);
         pile.Inventory.Add("fertilizer", 1); Got("fertilizer");
     }
     // Only chests, piles and placed crates take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
@@ -2121,14 +2164,14 @@ public sealed partial class World {
         // A station, farm plot or mine site that uses the item takes it as storage asking for it does: its input slots, its fuel slot, the materials it lacks.
         foreach (var kind in stationKinds) Users(kind);
         Users(ThingKind.Farm); Users(ThingKind.Mine);
-        if (Barrels.PouredLiquid(Data, item) == BerryJam.Liquid) Users(ThingKind.Barrel);
+        if (Barrels.PouredLiquid(Data, item, unit) == BerryJam.Liquid) Users(ThingKind.Barrel);
         return best;
 
         void Users(ThingKind kind) {
             foreach (var t in S.Things.Of(kind)) {
                 // Distance first: asking a station what it takes costs more than a nearer place already found saves.
                 float distance = t.Pos.DistanceSquaredTo(origin);
-                if (t.Id == exclude || best != null && bestRank == 0 && distance >= bestDistance || Intake(t, item, false) == null) continue;
+                if (t.Id == exclude || best != null && bestRank == 0 && distance >= bestDistance || Intake(t, item, false, unit) == null) continue;
                 best = t; bestRank = 0; bestDistance = distance;
             }
         }
@@ -2190,7 +2233,7 @@ public sealed partial class World {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
-        float step = dt * WorkerSpeed * GravelPaths.SpeedAt(w.Pos) * (Barrel.In(w.Bag) is string barrel ? Barrel.Speed(barrel) : 1);
+        float step = dt * WorkerSpeed * GravelPaths.SpeedAt(w.Pos) * (Barrel.In(w.Bag) is string barrel ? Barrel.Speed(w.Bag.Object(barrel)) : 1);
         if (Travel(w, destination, Math.Min(step, distance - reach + .05f), step, exact: exact)) return false;
         if (!exact && distance < WalkReach) return true;
         w.Status = BlockedPath; w.WorkState = WorkerWorkState.Blocked;
@@ -2304,7 +2347,8 @@ public sealed partial class World {
             foreach (var t in S.Things.Of(kind)) {
                 if (t == pile || t.Compost) continue;
                 foreach (var pair in t.Inventory.Items) {
-                    if (!Compostable(pair.Key) || pile.SkipFood && Data.IsFood(pair.Key) || !t.Inventory.AllowsWithdrawal(pair.Key) || !pile.Inventory.Accepts(pair.Key) || pile.Inventory.Room(pair.Key) == 0) continue;
+                    var unit = t.Inventory.Object(pair.Key);
+                    if (!Compostable(pair.Key, unit) || pile.SkipFood && IsFood(t.Inventory, pair.Key) || !t.Inventory.AllowsWithdrawal(pair.Key) || !pile.Inventory.Accepts(pair.Key, unit) || pile.Inventory.Room(pair.Key) == 0) continue;
                     if (!HandsFree(w, dt)) return true;
                     w.Status = Phrase("Fetching ", Data.Name(pair.Key), " for the compost");
                     if (Walk(w, t.Pos, dt)) { t.Inventory.TransferTo(w.Bag, pair.Key, w.Bag.StackSize, true); w.Destination = pile.Id; }
@@ -2353,7 +2397,7 @@ public sealed partial class World {
     private bool ReturnTool(Worker w, float dt) {
         Thing? station = null; float nearest = 0;
         foreach (var t in S.Things.Of(ThingKind.Toolstation))
-            if (Holds(t, w.Tool) && t.Inventory.Room(w.Tool) > 0 && t.Inventory.Accepts(w.Tool) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
+            if (Holds(t, w.Tool, w.ToolSlot.Object(w.Tool)) && t.Inventory.Room(w.Tool) > 0 && t.Inventory.Accepts(w.Tool, w.ToolSlot.Object(w.Tool)) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
         if (station == null) return true;
         w.Status = Phrase("Putting back the ", Lower(Data.Name(w.Tool)));
         if (!Walk(w, station.Pos, dt)) return false;
@@ -2365,14 +2409,15 @@ public sealed partial class World {
     private bool toolsChanged = true;
     internal void ToolsChanged() => toolsChanged = true;
     /// <summary>Has a tool station's contents and filters report to the tool kinds stations give out.</summary>
-    private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
+    private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; station.Inventory.ByKind = true; toolsChanged = true; }
     /// <summary>The rack's best free tool of a kind when its filter lets it out, or null.</summary>
     private string? ToolGivenOut(Thing station, string kind) {
         var items = station.Inventory;
         if (kind is not (BarrelHaul.WaterTool or Bucket.Item)) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
         string? bottle = null;
         foreach (var (item, _) in items.Items) {
-            if (!BarrelHaul.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
+            // Only an empty vessel or one holding water goes out for watering.
+            if (!BarrelHaul.Vessel(item) || Vessels.LiquidIn(items.Object(item)) is string held && held != Water.Liquid || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
             if (Bucket.Is(item)) return item;
             bottle ??= item;
         }
@@ -2464,6 +2509,17 @@ public sealed partial class World {
         }
         if (order.Buying) foreach (string item in order.Goods.Keys) Got(item);
         foreach (var (item, quantity) in goods) {
+            // A full vessel the village sells, such as a water bottle, comes as the vessel holding its liquid.
+            if (Data.Items.GetValueOrDefault(item)?.FullOf is string liquid && Data.VesselFor(liquid) is VesselDef full) {
+                for (int i = 0; i < quantity; i++) {
+                    var bottle = Vessels.Holding(full.Empty, S.NextId++, full.Capacity, liquid, full.Capacity);
+                    if (output.Add(bottle)) continue;
+                    var box = Add(ThingKind.Grave, sign?.Pos + Vector2.One ?? Terrain.Spawn);
+                    box.Inventory.Slots = 1;
+                    box.Inventory.Add(bottle);
+                }
+                continue;
+            }
             int overflow = quantity - output.Add(item, quantity);
             if (overflow <= 0) continue;
             var delivery = Add(ThingKind.Grave, sign?.Pos + Vector2.One ?? Terrain.Spawn);
@@ -2734,7 +2790,7 @@ public sealed partial class World {
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
     // ---------- Validation of saves and guests ----------
     /// <summary>Whether an id names a known item, or a packed crate where <paramref name="crates"/> allows one.</summary>
-    private bool KnownItem(string item, bool crates) => IsPacked(item) ? crates && PackedId(item) > 0 : Item.IsKey(item) ? Item.IdOf(item) > 0 && Item.IsObject(Item.KindOf(item)) && Data.Items.ContainsKey(Item.KindOf(item)) : !Item.IsObject(item) && Data.Items.ContainsKey(item);
+    private bool KnownItem(string item, bool crates) => IsPacked(item) ? crates && PackedId(item) > 0 : Item.IsKey(item) ? Item.IdOf(item) > 0 && Data.Items.ContainsKey(Item.KindOf(item)) && (Item.IsObject(Item.KindOf(item)) || Array.IndexOf(Item.Holders, Item.KindOf(item)) >= 0) : !Item.IsObject(item) && Data.Items.TryGetValue(item, out var def) && def.FullOf == null;
     /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
     private bool ValidCounts(IReadOnlyDictionary<string, int> items, bool crates) {
         foreach (var (item, count) in items) if (count <= 0 || !KnownItem(item, crates)) return false;
@@ -2748,7 +2804,9 @@ public sealed partial class World {
     private bool ValidObject(Item unit) => unit.Kind switch {
         Lanterns.Item => Lanterns.Valid(unit),
         Crate => unit.Id > 0 && unit.Contents is { Count: > 0 } goods && ValidInventory(goods, false) && goods.Count <= Data.CrateCapacity && Barrel.In(goods) == null,
-        _ => false
+        _ => unit.Id > 0 && unit.Contents is { Count: > 0, Items.Count: 1, Slots: 1 } held && held.Layout.Count == 1 && Vessels.LiquidIn(unit) is string liquid
+            && held.StackSize == held.Capacity && held.Capacity == (unit.Kind == Barrel.Item ? Barrel.Capacity : Data.VesselOf(unit.Kind, liquid)?.Capacity ?? -1) && held.Count <= held.Capacity
+            && (unit.Kind == Barrel.Item ? Data.VesselFor(liquid) != null : Data.VesselOf(unit.Kind, liquid) != null) && held.ValidUnits(_ => false)
     };
     /// <summary>
     /// Whether a player from a save or a joining guest carries only known items and has needs, torch and respawn timer within their limits.
@@ -2785,7 +2843,7 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Hole && !GroundHoles.Valid(t)) return false;
             if (!Plumbing.ValidReceiver(t) || !GlassBlowing.Valid(t) || !Lanterns.Valid(t)) return false;
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
-                || t.Inventory.Count == 1 && (Barrel.In(t.Inventory) is not string barrel || Barrel.LiquidOf(barrel) != Water.Liquid))) return false;
+                || t.Inventory.Count == 1 && (Barrel.In(t.Inventory) is not string barrel || Barrel.LiquidOf(t.Inventory.Object(barrel)) != Water.Liquid))) return false;
             // A building has the boxes its kind is made with.
             if (SlotRules(t.Kind).Length > 0 && t.Tools == null || Burns(t.Kind) && t.Burner == null || t.Kind == ThingKind.Signpost && t.Wages == null
                 || t.Kind is ThingKind.Signpost or ThingKind.Farm or ThingKind.Packer or ThingKind.Mine && t.Output == null) return false;

@@ -148,17 +148,18 @@ public partial class Hotbar : PanelContainer {
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
             bool lantern = Lanterns.IsItem(id);
             int bugs = count > 0 && lantern ? Lanterns.BugCount(world.S.Backpack, id) : -1;
-            var shown = (id, count, active, life, bugs, World.IsPacked(id) ? world.S.Backpack.Object(id)?.Contents?.Count ?? 0 : 0);
+            var unit = world.S.Backpack.Object(id);
+            var shown = (id, count, active, life, bugs, unit?.Contents?.Count ?? 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
             var badge = Counts[slot];
             if (building || count == 0) badge.SetCount("");
-            else if (count == 1 && Barrel.Is(id)) badge.SetCount($"{Barrel.Liters(id)}/{Barrel.Capacity} L");
+            else if (count == 1 && Barrel.Is(id)) badge.SetCount($"{Barrel.Liters(unit)}/{Barrel.Capacity} L");
             else if (count == 1 && world.Data.VesselOf(id) is VesselDef vessel)
-                badge.SetCount($"{vessel.LitersIn(id)}/{vessel.Capacity}");
+                badge.SetCount($"{Vessels.LitersIn(unit)}/{vessel.Capacity}");
             else badge.SetStack(count, bugs);
-            button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
+            button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(Vessels.LookOf(world.Data, world.S.Backpack, id));
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id, world.S.Backpack)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";

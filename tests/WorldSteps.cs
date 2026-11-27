@@ -120,7 +120,7 @@ internal static class WorldSteps {
         world.Player = shore + inland * 6;
         var lake = world.Add(ThingKind.Water, shore, 9999);
         var bottles = world.Add(ThingKind.Pile, shore + inland * 4);
-        bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2);
+        StockVessel(world, bottles.Inventory, Water.Empty, Water.Liquid, Water.Capacity, 4); StockVessel(world, bottles.Inventory, Water.Empty, Water.Liquid, 2, 2);
         world.Add(ThingKind.Pile, shore + inland * 4 + new Vector2(-3, 0)).Inventory.Add(Water.Empty, 4);
         stock = TakeEverything(world, world.Add(ThingKind.Chest, shore + inland * 4 + new Vector2(3, 0)));
         stock.Inventory.Slots = 40; stock.Inventory.Add("raw_meat", 64); stock.Inventory.Add("wood", 64);

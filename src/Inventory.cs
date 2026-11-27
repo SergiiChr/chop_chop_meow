@@ -105,6 +105,8 @@ public sealed class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Gated { get; set; }
     /// <summary>The filter entry that names every item; it stands alone in its row.</summary>
     public const string Everything = "everything";
+    /// <summary>Whether a filter entry for a container's kind takes it whatever it holds, as a tool rack's does; elsewhere such an entry takes only empty ones.</summary>
+    [JsonIgnore] public bool ByKind { get; set; }
     /// <summary>A debug chest has room for as many stacks as are put in it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UnlimitedSlots { get; set; }
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
@@ -445,19 +447,25 @@ public sealed class Inventory {
     public bool AllowsWithdrawal(string item) => Passes(OutputFilter, item, Object(item));
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     /// <param name="unit">The object the item's key finds in the box it comes from.</param>
-    public bool Wants(string item, Item? unit = null) => Names(InputFilter, item, unit);
+    public bool Wants(string item, Item? unit = null) => Names(InputFilter, item, unit, ByKind);
     /// <summary>Whether a stack takes more of an item: a stack of it, unless its units expire and a player holds part of it, as the held ones must stay in front.</summary>
     private static bool TopsUp(Slot slot, string item) => slot.Item == item && (slot.Held == 0 || !HasUnits(item));
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
-    private bool Passes(FilterList filter, string item, Item? unit) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item, unit);
-    /// <summary>A filter names an item itself, the kind of an object such as a lantern, or a packed crate of the good it holds.</summary>
-    private static bool Names(FilterList filter, string item, Item? unit) {
+    private bool Passes(FilterList filter, string item, Item? unit) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item, unit, ByKind);
+    /// <summary>A filter names an item itself, the kind of an object that is always one, such as a lantern, or a packed crate of the good it holds.</summary>
+    private static bool Names(FilterList filter, string item, Item? unit, bool byKind) {
         if (World.PackedGood(unit) is string good) {
             foreach (string named in filter) if (World.NamesCrateOf(named, good)) return true;
             return false;
         }
-        return filter.Contains(item) || ChopChopMeow.Item.IsKey(item) && filter.Contains(ChopChopMeow.Item.KindOf(item));
+        // A container holding a liquid goes under its entry for that liquid, or under its kind where any fill counts, as on a tool rack.
+        if (World.Holding(unit) is var (container, liquid)) {
+            foreach (string named in filter) if (World.NamesHolding(named, container, liquid)) return true;
+            return byKind && filter.Contains(container);
+        }
+        // Only an object that is always one, such as a lantern, goes under its kind: a container holding something has no entry of its own.
+        return filter.Contains(item) || ChopChopMeow.Item.IsKey(item) && filter.Contains(ChopChopMeow.Item.KindOf(item)) && (byKind || ChopChopMeow.Item.IsObject(ChopChopMeow.Item.KindOf(item)));
     }
 
     /// <summary>Adds up to <paramref name="quantity"/> units of an item and returns how many fit.</summary>
@@ -570,17 +578,10 @@ public sealed class Inventory {
         return true;
     }
 
-    internal bool CanReplaceOne(string oldItem, string newItem) {
-        if (Free(oldItem) <= 0) return false;
-        if (oldItem == newItem || Room(newItem, replacing: true) > 0) return true;
-        foreach (var slot in Layout) if (slot.Item == oldItem && slot.Count == 1 && Takeable(slot) > 0) return true;
-        return false;
-    }
-
-    /// <summary>The units that can become an item that takes one cell per unit.</summary>
-    internal int RoomForFilled(string empty, string filled) {
+    /// <summary>The units of an empty container that could each become a filled one, an object taking a cell of its own.</summary>
+    internal int RoomForFilled(string empty) {
         if (StackOf(empty) == 1) return Free(empty);
-        int room = Room(filled, replacing: true), count = 0;
+        int room = Room(ChopChopMeow.Item.KeyOf(empty, 0), replacing: true), count = 0;
         for (int i = Math.Min(Slots, Layout.Count) - 1; i >= 0; i--) {
             var slot = Layout[i];
             if (slot.Item != empty) continue;
@@ -594,43 +595,37 @@ public sealed class Inventory {
         return count;
     }
 
-    /// <summary>Changes one vessel, preserving its cell whenever the whole cell changes.</summary>
-    public bool ReplaceOne(string oldItem, string newItem) {
-        if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem) {
-            if (Takeable(Layout[PreferredSlot]) == 0) return false;
-            if (Layout[PreferredSlot].Count == 1) return Replace(oldItem, newItem);
-        } else {
-            for (int i = 0; i < Layout.Count; i++) {
-                if (Layout[i].Item != oldItem || Layout[i].Count != 1 || Takeable(Layout[i]) <= 0) continue;
-                int previous = PreferredSlot;
-                PreferredSlot = i;
-                try { return Replace(oldItem, newItem); } finally { PreferredSlot = previous; }
-            }
+    /// <summary>Whether the rest of a cell's stack fits in other cells, as when one unit of it becomes an object in that cell.</summary>
+    internal bool RoomForRest(int at) {
+        if ((uint)at >= (uint)Layout.Count || Layout[at] is not { Item: not "" } slot) return false;
+        return slot.Count == 1 || Room(slot.Item, replacing: true) - (StackOf(slot.Item) - slot.Count) >= slot.Count - 1;
+    }
+
+    /// <summary>
+    /// Turns one unit of an empty container, from <see cref="PreferredSlot"/> first, into an object holding something.
+    /// A unit alone in its cell becomes the object there, keeping its hotbar slot; one from a stack goes to a free cell.
+    /// With <paramref name="keepCell"/>, the object takes the chosen unit's cell and the rest of its stack moves to others.
+    /// </summary>
+    internal bool FillOne(string empty, Item filled, bool keepCell = false) {
+        // A unit that changes in its own cell is not taken out, so a hotbar binding does not keep it from filling there.
+        int Usable(Slot s) => keepCell ? s.Free : Takeable(s);
+        int at = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == empty && Usable(Layout[PreferredSlot]) > 0 ? PreferredSlot : -1;
+        if (at < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == empty && Usable(Layout[i]) > 0 && (at < 0 || Layout[i].Count == 1)) at = i;
+        if (at < 0) return false;
+        var slot = Layout[at];
+        int rest = slot.Count - 1;
+        if (rest > 0 && !(keepCell ? RoomForRest(at) : Room(filled.Key, replacing: true) > 0)) return false;
+        if (rest > 0 && !keepCell) {
+            Take(empty, 1, false);
+            return Add(filled);
         }
-        if (oldItem == newItem || Free(oldItem) == 0 || Room(newItem, replacing: true) == 0) return false;
-        Take(oldItem, 1, false);
-        Add(newItem, 1);
-        return true;
-    }
-
-    /// <summary>Whether the other empty barrels can fit elsewhere when one barrel changes fill in its own cell.</summary>
-    internal bool CanSplitBarrelStack(int at) {
-        var stack = Layout[at];
-        return stack.Count == 1 || Room(stack.Item, replacing: true) >= StackOf(stack.Item) - 1;
-    }
-
-    /// <summary>Changes the chosen barrel's fill in its cell and returns the rest of its stack to the backpack.</summary>
-    internal void SetBarrelFill(int at, string item) {
-        var stack = Layout[at];
-        string before = stack.Item;
-        if (before == item) return;
-        int rest = stack.Count - 1;
-        int elsewhere = this[before] - stack.Count;
-        if (elsewhere == 0) items.Remove(before); else items[before] = elsewhere;
-        stack.Item = item; stack.Count = 1;
-        items[item] = this[item] + 1;
-        if (rest > 0) Add(before, rest);
+        int left = this[empty] - slot.Count;
+        if (left == 0) items.Remove(empty); else items[empty] = left;
+        slot.Item = filled.Key; slot.Count = 1; slot.Units = [filled];
+        items[filled.Key] = 1;
+        if (rest > 0) Add(empty, rest);
         else Changed?.Invoke();
+        return true;
     }
 
     /// <summary>Whether units nobody holds cover the cost.</summary>

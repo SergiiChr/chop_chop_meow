@@ -13,7 +13,7 @@ internal sealed class StoreHaul : PlaceHaul {
 
     public override void Carries(Worker w, Thing t, ref Carry best) {
         foreach (var (item, _) in t.Inventory.Items) {
-            int free = t.Inventory.Free(item);
+            int free = World.FreeLike(t.Inventory, item);
             if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to) continue;
             Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Hauling.Takes(world, to, item, free, t.Inventory.Object(item)), Rule = 1 });
         }
@@ -36,10 +36,11 @@ internal sealed class StoreHaul : PlaceHaul {
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (t == store || best != null && distance >= nearest) continue;
                 foreach (var (held, _) in t.Inventory.Items) {
-                    int free = t.Inventory.Free(held);
+                    int free = World.FreeLike(t.Inventory, held);
+                    var unit = t.Inventory.Object(held);
                     // A liquid leaves a station only in vessels, which its own hauler brings.
-                    if (free == 0 || !store.Inventory.Wants(held) || !t.Inventory.AllowsWithdrawal(held) || (station ? world.Pending(t, held) : t.Inventory.Wants(held))
-                        || world.Data.VesselFor(held) != null || world.Intake(store, held, false) is not (_, int room)) continue;
+                    if (free == 0 || !store.Inventory.Wants(held, unit) || !t.Inventory.AllowsWithdrawal(held) || (station ? world.Pending(t, held) : t.Inventory.Wants(held, unit))
+                        || world.Data.VesselFor(held) != null || world.Intake(store, held, false, unit) is not (_, int room)) continue;
                     item = held; best = t; nearest = distance; count = Math.Min(free, room);
                     break;
                 }

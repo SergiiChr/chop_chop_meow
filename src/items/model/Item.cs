@@ -15,7 +15,7 @@ public sealed class Item {
     /// <summary>The kinds whose every unit is an object found by its key, such as a lantern.</summary>
     internal static readonly string[] Keyed = [Lanterns.Item];
     /// <summary>The kinds that are objects only while they hold something, such as a packed crate, and plain units of their kind once empty.</summary>
-    internal static readonly string[] Holders = [World.Crate];
+    internal static readonly string[] Holders = [World.Crate, Water.Empty, Bucket.Item, Barrel.Item];
     private const char KeyMark = '#';
 
     public string Kind { get; set; } = "";
@@ -26,8 +26,9 @@ public sealed class Item {
     /// <summary>What it holds, such as a lantern's firebugs, or null for nothing.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Inventory? Contents { get; set; }
 
-    /// <summary>The key a cell holding this object is found by: its kind and its number, such as lantern#17.</summary>
-    [JsonIgnore] public string Key => KeyOf(Kind, Id);
+    /// <summary>The key a cell holding this object is found by: its kind and its number, such as lantern#17, made once.</summary>
+    [JsonIgnore] public string Key => key ??= KeyOf(Kind, Id);
+    private string? key;
 
     internal static string KeyOf(string kind, int id) => $"{kind}{KeyMark}{id}";
     /// <summary>Whether an item id is an object's key rather than a kind.</summary>

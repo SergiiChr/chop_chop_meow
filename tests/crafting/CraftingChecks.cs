@@ -775,7 +775,7 @@ public static class CraftingChecks {
         Require(table.Inventory[BerryJam.Liquid] == 1 && world.Backpack[BerryJam.Liquid] == 0, "loose jam must stay at the table without a vessel");
         Give(world, Water.Empty);
         world.Collect(table);
-        Require(table.Inventory[BerryJam.Liquid] == 0 && world.Backpack[BerryJam.Bottles[1]] == 1, "an empty bottle should take one liter of jam");
+        Require(table.Inventory[BerryJam.Liquid] == 0 && Vessels.Count(world.Backpack, Water.Empty, BerryJam.Liquid, 1) == 1, "an empty bottle should take one liter of jam");
 
         var cannery = world.Add(ThingKind.Cannery, new Vector2(24, 20));
         world.Player = cannery.Pos + Vector2.One;

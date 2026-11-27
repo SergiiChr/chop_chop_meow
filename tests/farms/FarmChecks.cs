@@ -58,8 +58,8 @@ public static class FarmChecks {
         Require(worker.Status.StartsWith("Sowing back "), "the hauler should be on the way to move the spare seed");
         world.Transfer(world.Backpack, farm.Inventory, "wheat_seeds", 1);
         Work(world, 8);
-        Give(world, Bucket.AtFill(10));
-        Require(farm.Inventory["wheat_seeds"] == 64 && world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 1) == 1,
+        string bucket = GiveVessel(world, Bucket.Item, Water.Liquid, 10);
+        Require(farm.Inventory["wheat_seeds"] == 64 && world.Transfer(world.Backpack, farm.Inventory, bucket, 1) == 1,
             "a seed stack filled while the hauler walks must still leave a slot for water");
     }
 
@@ -72,9 +72,9 @@ public static class FarmChecks {
         Require(world.Farms.CropLook(farm) == 1, "a sown plot should show soil");
         var looks = new List<int>();
         for (int day = 0; day < 3; day++) {
-            Give(world, Bucket.AtFill(10));
-            Require(world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 1) == 1,
-                $"a plot takes a full bucket on day {day + 1}: {world.Backpack[Bucket.AtFill(10)]} buckets held, {world.Farms.WaterLevel(farm):0.###} L left, in reach: {world.Reaches(farm)}");
+            string bucket = GiveVessel(world, Bucket.Item, Water.Liquid, 10);
+            Require(world.Transfer(world.Backpack, farm.Inventory, bucket, 1) == 1,
+                $"a plot takes a full bucket on day {day + 1}: {Vessels.Count(world.Backpack, Bucket.Item, Water.Liquid, 10)} buckets held, {world.Farms.WaterLevel(farm):0.###} L left, in reach: {world.Reaches(farm)}");
             Work(world, data.DaySeconds - 1);
             looks.Add(world.Farms.CropLook(farm));
             Work(world, 1);
@@ -150,9 +150,9 @@ public static class FarmChecks {
 
     private static void CheckPlotHoldsTenLitersAndKeepsWaterOnLoad(GameData data) {
         var (world, _, farm) = FarmBesideCompost(data);
-        Give(world, Bucket.AtFill(10), 2);
-        Require(world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 2) == 1, "only one full bucket fits in the plot");
-        Require(world.Backpack[Bucket.AtFill(10)] == 1 && world.Backpack[Bucket.Item] == 1, "the other bucket stays full");
+        string first = GiveVessel(world, Bucket.Item, Water.Liquid, 10), second = GiveVessel(world, Bucket.Item, Water.Liquid, 10);
+        Require(world.Transfer(world.Backpack, farm.Inventory, first, 1) + world.Transfer(world.Backpack, farm.Inventory, second, 1) == 1, "only one full bucket fits in the plot");
+        Require(Vessels.Count(world.Backpack, Bucket.Item, Water.Liquid, 10) == 1 && world.Backpack[Bucket.Item] == 1, "the other bucket stays full");
         Work(world, data.DaySeconds / 2);
         Require(farm.Inventory[Water.Liquid] == 10, "a fallow plot does not use water");
 
@@ -160,7 +160,7 @@ public static class FarmChecks {
         world.Transfer(world.Backpack, farm.Inventory, "fertilizer", 1);
         SafeTick(world, 42);
         Require(Math.Abs(world.Farms.WaterLevel(farm) - 9.5f) < .001f, "half of the first liter should remain in use");
-        Require(world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 1) == 0, "the liter in use still counts toward capacity");
+        Require(world.Transfer(world.Backpack, farm.Inventory, second, 1) == 0, "the liter in use still counts toward capacity");
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
         var restored = loaded.Find(farm.Id)!;
@@ -168,8 +168,8 @@ public static class FarmChecks {
         Work(loaded, data.DaySeconds / 2 - 42);
         Require(Math.Abs(loaded.Farms.Growth(restored) - data.DaySeconds / 2) < .01f && restored.Inventory[Water.Liquid] == 5,
             "a half day of growth consumes five liters");
-        Require(loaded.Transfer(loaded.Backpack, restored.Inventory, Bucket.AtFill(10), 1) == 1
-            && loaded.Backpack[Bucket.AtFill(5)] == 1 && restored.Inventory[Water.Liquid] == 10,
+        Require(loaded.Transfer(loaded.Backpack, restored.Inventory, second, 1) == 1
+            && Vessels.Count(loaded.Backpack, Bucket.Item, Water.Liquid, 5) == 1 && restored.Inventory[Water.Liquid] == 10,
             "a partial refill should leave the other five liters in the bucket");
     }
 

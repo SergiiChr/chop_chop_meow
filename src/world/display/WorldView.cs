@@ -783,7 +783,8 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
             bool waterTool = BarrelHaul.Vessel(worker.Tool);
-            string? vessel = waterTool || BerryJam.InBottle(worker.Tool) ? worker.Tool : null;
+            string? vessel = waterTool ? Vessels.LookOf(World.Data, worker.ToolSlot, worker.Tool) : null;
+            bool filled = Vessels.LitersIn(worker.ToolSlot.Object(worker.Tool)) > 0;
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null && waterTool) {
                 var point = waterTarget.Kind switch {
@@ -795,7 +796,7 @@ public partial class WorldView : Node3D {
                 };
                 float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
                 bool watering = waterTarget.Kind == ThingKind.Farm;
-                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel,
+                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel, filled,
                     ground: watering, facing: watering ? state.Yaw : null, rotation: waterTarget.Rotation);
                 if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
                     float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
@@ -807,7 +808,7 @@ public partial class WorldView : Node3D {
                 if (work == ActorAction.Carry && worker.Bag.First() is string load && ContainerItem.IsBottle(load)) vessel = load;
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
-                    vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
+                    vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null, filled: filled);
                 if (slotted != null) swung.Add(assignment!.Id);
             }
             entry.Rig.Root.Visible = DrawsWorker(worker);
@@ -985,7 +986,7 @@ public partial class WorldView : Node3D {
             bool torch = who.Torch > 0 && who.RespawnIn <= 0 && (who.TorchLit || who.TorchKindling > 0 || equipped == null);
             if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
             else {
-                string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
+                string? vessel = Carries(state) && Water.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? Vessels.LookOf(World.Data, who.Backpack, who.Selected) : null;
                 bool barrel = HugsBarrel(state.Action, who.Backpack);
                 holdLantern = equipped != null && who.Health > 0 && who.Sheltered == 0 && !torch && !barrel && vessel == null
                     && door == null && pull.PullL <= 0 && Carries(state);
@@ -997,8 +998,8 @@ public partial class WorldView : Node3D {
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
-        float dt = 0, bool barrel = false, string? vessel = null) =>
-        ShowStanding(rig, state, StandingPose(rig, state), tool, torch, door, dt, barrel, vessel);
+        float dt = 0, bool barrel = false, string? vessel = null, bool filled = false) =>
+        ShowStanding(rig, state, StandingPose(rig, state), tool, torch, door, dt, barrel, vessel, filled);
 
     /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
     private static Pose StandingPose(ActorRig rig, ActorState state, float rise = 0) {
@@ -1023,7 +1024,7 @@ public partial class WorldView : Node3D {
 
     /// <summary>Draws the actor in its standing pose, settling its feet onto the steps while at a cabin door.</summary>
     private static void ShowStanding(ActorRig rig, ActorState state, Pose pose, string? tool, bool torch,
-        DoorShown? door, float dt, bool barrel, string? vessel) {
+        DoorShown? door, float dt, bool barrel, string? vessel, bool filled = false) {
         Vector3? jamb = null;
         if (door is DoorShown at) {
             (pose, jamb) = DoorwayView.StandAt(pose, state, at, state.OnSteps ? dt : StairSteps.Settle);
@@ -1038,7 +1039,7 @@ public partial class WorldView : Node3D {
             rig.Show(pose, null, false, lit: torch);
             rig.ShowWeapon(weapon, state.Time);
         } else if (barrel) rig.HugBarrel(pose, torch);
-        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, torch);
+        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, filled, torch);
         else if (tool != null && Carries(state) && WeaponSwing.ForItem(tool) is { CarriesUpright: true } ready) {
             rig.Show(ready.FollowGrip(pose, 0), null, false, lit: torch);
             rig.ShowWeapon(ready, 0);

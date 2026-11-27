@@ -312,9 +312,7 @@ public partial class Game {
     private async Task CheckHoldingRightMouseOnShoreRefillsRetainedBottle() {
         RemoveThings(Hosted, t => t.Kind == ThingKind.Water);
         Hosted.Add(ThingKind.Water, world.Player + Vector2.Right * 20, 9999);
-        Drop(Hosted, "water");
-        Drop(Hosted, "water_1");
-        Drop(Hosted, "water_2");
+        for (int liters = 1; liters <= Water.Capacity; liters++) DropVessels(Hosted, Water.Empty, Water.Liquid, liters);
         Give(Hosted, "empty_bottle", 1);
         var shore = Terrain.WaterPoint(world.Player);
         Warp(Hosted, shore + (shore - Terrain.Lake).Normalized() * 1.8f);
@@ -329,7 +327,7 @@ public partial class Game {
         Require(HasLabel(panel, "Hold RMB to drink or fill a container."), "The lake must show how to collect water.");
         await CloseWithEsc();
         var press = RightPress(shore, .8f);
-        await Until(() => world.Backpack["water"] == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);
+        await Until(() => Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);
         RightRelease(press);
         await Frames(3);
 

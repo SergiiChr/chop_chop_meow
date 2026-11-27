@@ -45,7 +45,7 @@ public static class NeedsChecks {
     private static void CheckBerriesFeedMoreWhenPrepared(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "berries", 1); Give(world, "crushed_berries", 1); Give(world, "canned_jam", 1);
-        Give(world, BerryJam.Bottle);
+        string jam = GiveVessel(world, Water.Empty, BerryJam.Liquid, 3);
         SetNeeds(world, hunger: 20);
         world.Consume("berries");
         Require(world.Hunger == 25, "a berry should restore five hunger");
@@ -54,8 +54,8 @@ public static class NeedsChecks {
         world.Consume("canned_jam");
         Require(world.Hunger == 100 && world.Backpack["canned_jam"] == 0, "a can of jam should fill but not overfill the hunger bar");
         SetNeeds(world, hunger: 1);
-        world.Consume(BerryJam.Bottle);
-        Require(world.Hunger == 100 && world.Backpack[BerryJam.Bottles[2]] == 1, "drinking jam should use one liter and leave the bottle");
+        world.Consume(jam);
+        Require(world.Hunger == 100 && Vessels.Count(world.Backpack, Water.Empty, BerryJam.Liquid, 2) == 1, "drinking jam should use one liter and leave the bottle");
     }
 
     /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>
@@ -73,8 +73,8 @@ public static class NeedsChecks {
         Require(world.Backpack["wheat"] == 1, "raw wheat should not be eaten as it is");
         Require(data.IsFood("wheat"), "raw wheat should count as food for compost and wolves");
         Require(data.IsConsumable("wheat"), "raw wheat should count as consumable");
-        Require(!data.IsFood("water"), "water should not be food");
-        Require(data.IsConsumable("water"), "water should be drinkable");
+        Require(!data.IsFood(Water.Liquid) && !data.IsFood(Water.Empty), "water should not be food");
+        Require(data.VesselOf(Water.Empty, Water.Liquid)?.Thirst > 0, "water should be drinkable from its bottle");
         Require(!data.IsFood("tin_can"), "cans should not be food");
     }
 }

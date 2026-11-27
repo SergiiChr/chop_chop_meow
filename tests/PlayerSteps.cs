@@ -14,6 +14,15 @@ internal static class PlayerSteps {
     /// <summary>The slot of a building's inventory a stack of an item lies in, or -1.</summary>
     public static int SlotOf(Inventory box, string item) => box.Layout.FindIndex(s => s.Item == item);
 
+    /// <summary>The key of a container in a box holding exactly so many liters of a liquid, such as a full water bottle; fails when the box holds none.</summary>
+    public static string VesselIn(Inventory box, string container, string liquid, int liters) {
+        string? key = Vessels.First(box, container, liquid, liters);
+        Require(key != null && Item.IsKey(key), $"the box should hold a {container} holding {liters} L of {liquid}");
+        return key!;
+    }
+
+    public static string VesselIn(InventoryView box, string container, string liquid, int liters) => VesselIn(box.Inventory, container, liquid, liters);
+
     /// <summary>Puts units of the held stack into storage, as a storage slot does: into slot <paramref name="slot"/>, or with -1 wherever the inventory takes them.</summary>
     public static void PutDown(World world, Inventory to, int slot, int count) => world.FromHeldStack(() => {
         if (world.Held is not HeldStack held || world.HeldBox is not Inventory from) return;
