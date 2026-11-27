@@ -698,11 +698,15 @@ The open mines and profit milestone together unlock the ending.
 It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
 most once a game, and shows them in turn.
 A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
-It takes up the statuses a game already has, with no popups, once the window has joined a game and taken the server's
-first update (`Net.Joined`): a new game, a load, joining another player's game and reconnecting.
-It also takes them up whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+The diary goal's popup waits while the find pop-up or the reading sheet is open, and later popups go ahead of it.
+`Game.OpenGoalFromPopup` puts back a held stack and ends any click mode or walk to a cabin, then opens the pause menu
+on the goal over whatever is open, the ending screen included.
+It skips the statuses a game already has, with no popups (`GoalPopup.SkipKnownGoals`), once the window has joined a
+game and taken the server's first update (`Net.Joined`): a new game, a load, joining another player's game and
+reconnecting.
+It also skips them whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
 or losing the line to the host drops the popups that game still had waiting.
-The showcase takes them up again after setting up its scene by hand.
+The showcase skips them again after setting up its scene by hand.
 
 ### Survival and needs
 
@@ -1888,6 +1892,7 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
 and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+The wolves' howls, the mortar and the two goal popup chimes keep their pitch (`Sounds.KeepsPitch`).
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts

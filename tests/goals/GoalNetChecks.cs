@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 public partial class Game {
     /// <summary>
-    /// The network scene of goal popups: the host lights a campfire goal before the guest joins, and the guest's window
+    /// The network scene of goal popups: the host reaches the campfire goal before the guest joins, and the guest's window
     /// pops up none of the goals the game already had.
     /// </summary>
     private NetScene GoalNetScene => new("goals", () => Achieve(Hosted, "campfire"), _ => Task.CompletedTask, GuestSeesNoPopupForGoalsTheGameHad);

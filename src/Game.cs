@@ -158,10 +158,10 @@ public partial class Game : Node, IGameFlow {
         corner = new Corner(world); ui.AddChild(corner);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);
-        // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
+        // _Process keeps it centred on the screen and clear of the needs and bank plate on the left, whose width it mirrors on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         // The menus and pages added after it cover it.
-        goalPopup = new GoalPopup(world, sounds, goal => menu.OpenGoal(goal)); ui.AddChild(goalPopup);
+        goalPopup = new GoalPopup(world, sounds, OpenGoalFromPopup, () => findPrompt.Visible || sheet.Visible); ui.AddChild(goalPopup);
         ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -187,12 +187,19 @@ public partial class Game : Node, IGameFlow {
         menu = new PauseMenu(kit, net, startMenu, this, recipeMap, () => panel.Open(Page.Diary));
         // Over the side panel's diary, and under the menus, which cover a find's pop-up while they are open.
         ui.AddChild(sheet); ui.AddChild(findPrompt);
-        ui.AddChild(menu); ui.AddChild(menu.GoalDetails); ui.AddChild(recipeMap);
+        // Under the pause menu, which a goal popup's click opens over it.
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
+        ui.AddChild(menu); ui.AddChild(menu.GoalDetails); ui.AddChild(recipeMap);
         ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         ui.AddChild(cursor);
         RefreshLive();
+    }
+    /// <summary>A click on a goal popup puts back a held stack and ends any click mode or walk to a cabin, then opens the goal over whatever is open.</summary>
+    private void OpenGoalFromPopup(Goal goal) {
+        if (!cursor.Empty) cursor.Release();
+        player.TryCancelMode(); player.CancelEntry();
+        menu.OpenGoal(goal);
     }
     private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
@@ -247,7 +254,7 @@ public partial class Game : Node, IGameFlow {
     private void OnJoined(bool back) {
         ending.Joined(back);
         // The world the window joined is complete only now, after the server's first update.
-        goalPopup.TakeUp();
+        goalPopup.SkipKnownGoals();
         shownHealth = world.Health;
         if (session is Session.Starting starting) Begin(starting.Slot);
         else if (session is Session.Returning returning) Notify($"{returning.Note} You are back in your game.");
@@ -400,7 +407,8 @@ public partial class Game : Node, IGameFlow {
 
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
-        if (world == null || view == null || ending.Visible) return;
+        // The ending takes no input of its own, apart from the pause menu a goal popup opens over it.
+        if (world == null || view == null || ending.Visible && !menu.Visible) return;
         if (blackHole.Showing) { if (blackHole.Asking && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) blackHole.Cancel(); return; }
         if (startMenu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) startMenu.Back(); return; }
         if (recipeMap.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) recipeMap.Close(); return; }
@@ -479,8 +487,9 @@ public partial class Game : Node, IGameFlow {
         }
         // Every frame, so a page that just opened takes its size once its wrapped text has a width.
         panel.Fit();
-        // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
-        float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? SidePanel.Left - 16 : -messagesLeft;
+        // The messages keep clear of the needs plate, which grows with the bank count, and stay centred on the screen, as the
+        // view does when a side panel opens.
+        float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = -messagesLeft;
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
         // The goal popup sits under the messages, across the same strip, and glides rather than jumps when a line comes or goes above it.
         float popupTop = messages.GetRect().End.Y + 8;

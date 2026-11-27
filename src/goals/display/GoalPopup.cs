@@ -11,6 +11,7 @@ namespace ChopChopMeow;
 /// the badge, which shrinks away.
 /// A goal revealed already done pops up only as completed.
 /// Goals a new, loaded or joined game already has stay quiet, and goals that change together pop up one after another.
+/// The diary goal's popup waits while a diary find or page is open, and shows once it is closed.
 /// Clicking it opens the pause menu on that goal's details.
 /// </summary>
 public partial class GoalPopup : Control {
@@ -32,9 +33,11 @@ public partial class GoalPopup : Control {
     private readonly World world;
     private readonly Sounds sounds;
     private readonly Action<Goal> open;
-    // Which goals have had their new and completed popups, or had that state already when the game was taken up.
+    private readonly Func<bool> pageOpen;
+    // Which goals have had their new and completed popups, or were already in that state when their popups were skipped.
     private readonly bool[] announcedNew = new bool[Goals.Entries.Length], announcedCompleted = new bool[Goals.Entries.Length];
-    private readonly Queue<(Goal Goal, GoalStatus Status)> waiting = new(2 * Goals.Entries.Length);
+    // Popups in the order their goals changed; one held back stays in place while later ones go ahead.
+    private readonly List<(Goal Goal, GoalStatus Status)> waiting = new(2 * Goals.Entries.Length);
     private readonly Control clip;
     private readonly Label heading, title;
     private float clock, openWidth, barWidth, badgeScale;
@@ -46,9 +49,12 @@ public partial class GoalPopup : Control {
     public string Heading => heading.Text;
     public string Title => title.Text;
 
-    /// <summary><paramref name="open"/> opens the pause menu on a goal's details.</summary>
-    public GoalPopup(World world, Sounds sounds, Action<Goal> open) {
-        this.world = world; this.sounds = sounds; this.open = open;
+    /// <summary>
+    /// <paramref name="open"/> opens the pause menu on a goal's details, and <paramref name="pageOpen"/> says whether a
+    /// diary find or page is open.
+    /// </summary>
+    public GoalPopup(World world, Sounds sounds, Action<Goal> open, Func<bool> pageOpen) {
+        this.world = world; this.sounds = sounds; this.open = open; this.pageOpen = pageOpen;
         Name = "goal_popup"; Visible = false; AnchorRight = 1;
         clip = new Control { ClipContents = true, MouseFilter = MouseFilterEnum.Ignore }; AddChild(clip);
         heading = Style.Text("", HeadingSize, Style.Beige, Style.Head); clip.AddChild(heading);
@@ -58,17 +64,18 @@ public partial class GoalPopup : Control {
         // and the bar's edges.
         float lineStep = heading.GetCombinedMinimumSize().Y - LineOverlap, top = (BadgeSize - lineStep - title.GetCombinedMinimumSize().Y) / 2;
         heading.Position = new Vector2(TextGap, top); title.Position = new Vector2(TextGap, top + lineStep);
-        TakeUp();
+        SkipKnownGoals();
         // Leaving a game for the start menu, or losing the line to the host, drops what that game still had to pop up.
-        world.Replaced += TakeUp;
+        world.Replaced += SkipKnownGoals;
     }
 
     /// <summary>
-    /// Notes the goals the game in hand already shows and drops any popup, so only what happens from now on pops up:
-    /// the game calls it once the window has joined a game, new, loaded or another player's.
-    /// It also runs whenever the world is replaced.
+    /// Counts every goal the window's world shows now as already popped up and drops any popup on screen or waiting, so
+    /// only what happens from now on pops up.
+    /// The game calls it once the window has joined a game, new, loaded or another player's, and whenever the world is
+    /// replaced.
     /// </summary>
-    public void TakeUp() {
+    public void SkipKnownGoals() {
         var goals = Goals.Entries;
         for (int i = 0; i < goals.Length; i++) {
             var status = world.Goals.Status(goals[i].Id);
@@ -89,18 +96,26 @@ public partial class GoalPopup : Control {
             var status = world.Goals.Status(goals[i].Id);
             if (status == GoalStatus.Hidden || status == GoalStatus.Active && announcedNew[i]) continue;
             announcedNew[i] = true; announcedCompleted[i] = status == GoalStatus.Completed;
-            waiting.Enqueue((goals[i], status));
+            waiting.Add((goals[i], status));
         }
     }
 
     public override void _Process(double delta) {
         if (showing == null) {
-            if (!waiting.TryDequeue(out var next)) return;
-            Start(next);
+            int next = NextReady();
+            if (next < 0) return;
+            Start(waiting[next]);
+            waiting.RemoveAt(next);
         }
         clock += (float)delta;
         if (clock >= ShowSeconds) { showing = null; Visible = false; return; }
         Animate();
+    }
+
+    /// <summary>The first waiting popup that may show now, or -1: the diary goal's waits while a diary find or page is open.</summary>
+    private int NextReady() {
+        for (int i = 0; i < waiting.Count; i++) if (waiting[i].Goal.Id != GoalId.Diary || !pageOpen()) return i;
+        return -1;
     }
 
     private void Start((Goal Goal, GoalStatus Status) next) {

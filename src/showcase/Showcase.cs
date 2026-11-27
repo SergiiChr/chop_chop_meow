@@ -64,8 +64,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         Stage();
         // A scene's goals are set by hand, not reached in play, so they pop up nothing.
         // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        // The default scene has sold goods already, which would complete Road to riches as it appears.
         bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
-        goalPopup.TakeUp();
+        if (popup) world.S.Milestones.Remove("sold");
+        goalPopup.SkipKnownGoals();
         if (popup) world.S.Milestones.Add("bench");
     }
 

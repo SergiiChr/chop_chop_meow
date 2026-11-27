@@ -35,8 +35,14 @@ public partial class Game {
         Require(sounds.Heard("page_turn", since), "Taking a page must turn a page.");
         await Frames(4);
         Require(!panel.Visible && !hotbar.DiaryBadge.Visible, "Taking the first page must open only its day, with the diary and its badge waiting behind it.");
+        // Longer than the goal popup's own refresh, so a popup for the diary goal would have started.
+        await Seconds(.5);
+        Require(goalPopup.Title != "A success story", "The diary goal must not pop up while its first page is open.");
         await KeyStroke(Key.Escape);
         await Until(() => !sheet.Visible && hotbar.DiaryBadge.Visible && hotbar.DiaryBadge.Scale.X > 1.5f, "closing the first page stamping the diary's badge into the bottom bar from large", 2);
+        await Until(() => goalPopup.Visible && goalPopup.Title == "A success story" && goalPopup.Heading == "New goal", "the diary goal popping up once its first page is closed", 7);
+        // No input skips a popup: this drops the diary goal's, so its chime and bar stay out of the checks after this one.
+        goalPopup.SkipKnownGoals();
         Require(!panel.Visible, "Closing the first page must leave the diary closed, for its badge to lead the way.");
         await Click(hotbar.DiaryBadge);
         var missing = Named("diary_day_2")!;
