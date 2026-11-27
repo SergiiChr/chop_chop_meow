@@ -175,7 +175,7 @@ public partial class Sounds : Node {
     /// <summary>Crossfades day and night tracks, and gives nearby campfire songs room to be heard.</summary>
     public void UpdateMusic(float dt) {
         float volume = MusicDb + Db(MusicVolume);
-        float soundtrack = campfireMusic.Update(World, dt, CampfirePaused, MusicVolume, volume);
+        float soundtrack = campfireMusic.Update(World, CampfirePaused, MusicVolume, volume);
         day.Update(World.Night ? 0 : soundtrack, dt, volume);
         night.Update(World.Night ? soundtrack : 0, dt, volume);
     }

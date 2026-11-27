@@ -1142,7 +1142,7 @@ public partial class Game {
             await TestClean(CheckPaintFilterSwitchDrawsTheFilter);
             await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await TestClean(CheckNewGameStartsTheWelcomePage);
-            await TestClean(CheckPausingACampfireSongBringsBackTheSoundtrack);
+            await RunCampfireMusicUIChecks();
             await RunControlsMenuUIChecks(inGame: true);
             await RunPauseMenuUIChecks();
             await RunGoalUIChecks(freshGame: true);

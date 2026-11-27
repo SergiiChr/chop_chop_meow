@@ -16,6 +16,11 @@ public partial class Game {
         var (guitar, drum, harmonica, listener) = AddCampfireCrew(Hosted, fire);
         await Until(() => Hosted.CampfireMusic.SongAt(fire.Id).Track > 0, "the idle workers starting a song at their campfire");
         Signal("campfire-playing", fire.Id.ToString(CultureInfo.InvariantCulture));
+        await Signaled("campfire-guest-menu");
+        await KeyStroke(Key.Escape);
+        Require(menu.Visible, "the host should open the pause menu after the guest");
+        await Signaled("campfire-guest-paused");
+        await KeyStroke(Key.Escape);
         await Signaled("campfire-guest-heard");
         Hosted.Fire(drum);
         await Signaled("campfire-guest-stopped");
@@ -34,6 +39,14 @@ public partial class Game {
         Require(harmonica.Fire == fire && harmonica.Instrument == CampfireInstrument.Harmonica, "the guest must see the trio's harmonica player");
         Require(guitar.Fire == fire && guitar.Instrument == CampfireInstrument.Guitar, "the guest must see the trio's guitarist");
         Require(drum.Fire == fire && drum.Instrument == CampfireInstrument.Drum, "the guest must see the trio's drummer");
+        await Until(() => !sounds.DayMusicPlaying, "the campfire song taking over the guest's soundtrack", 6);
+        await KeyStroke(Key.Escape);
+        Require(menu.Visible && !sounds.DayMusicPlaying, "the guest's menu alone should not pause the song");
+        Signal("campfire-guest-menu");
+        await Until(() => sounds.DayMusicPlaying, "the soundtrack returning when both players open their menus", 6);
+        Signal("campfire-guest-paused");
+        await Until(() => !sounds.DayMusicPlaying, "the song resuming even though the guest's menu is still open", 6);
+        await KeyStroke(Key.Escape);
         Signal("campfire-guest-heard");
         await Until(() => world.CampfireMusic.SongAt(fire).Track == 0, "the guest seeing the trio break up when its drummer leaves");
         Signal("campfire-guest-stopped");

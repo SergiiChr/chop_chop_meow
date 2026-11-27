@@ -92,7 +92,7 @@ public sealed class WorldUpdates {
     public Snapshot Empty() => spare.Count > 0 ? spare.Pop() : new Snapshot();
 
     /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel paths, stripped sand, steel pipes and packed crates.</summary>
-    public Snapshot Capture(World world) {
+    public Snapshot Capture(World world, bool paused = false) {
         var s = world.S;
         world.NumberWolvesAndOrders();
         world.ShareHeldStacks();
@@ -107,7 +107,10 @@ public sealed class WorldUpdates {
         }
         entryWriter.WriteEndObject();
         Keep(snapshot, new EntryKey(EntryKey.Work, 0));
-        Write(snapshot, new EntryKey(EntryKey.CampfireMusic, 0), world.CampfireMusic.State, UpdateJson.Default.CampfireMusicState);
+        var playback = paused ? CampfirePlayback.Paused
+            : world.Sleep.SpeedingUp ? CampfirePlayback.FastForwarding : CampfirePlayback.Normal;
+        Write(snapshot, new EntryKey(EntryKey.CampfireMusic, 0), world.CampfireMusic.State with { Playback = playback },
+            UpdateJson.Default.CampfireMusicState);
         // The state entry is written again on every update, as time moves: the tiles and crates, which seldom change, stay out of it.
         entry.ResetWrittenCount(); entryWriter.Reset(entry);
         entryWriter.WriteStartArray();

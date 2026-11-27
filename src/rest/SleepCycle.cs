@@ -14,7 +14,8 @@ public sealed class SleepCycle(World world) {
     private const int TargetRate = 12;
     private const float SleepStep = 1f / World.TicksPerSecond;
     private static readonly TimeSpan WorkBudget = TimeSpan.FromMilliseconds(4);
-    private bool speedingUp;
+    /// <summary>Whether ordinary ticks currently have extra steps to reach dawn.</summary>
+    internal bool SpeedingUp { get; private set; }
     /// <summary>Whether the speed-up or the skip to dawn is running steps of its own: they stay silent and do not count as time played.</summary>
     internal bool AdvancingTime { get; private set; }
     internal bool Recovering { get; private set; }
@@ -106,7 +107,7 @@ public sealed class SleepCycle(World world) {
         if (dawn) {
             if (!SomeoneAsleep()) return;
             var cabins = world.BedtimeWater.Occupants();
-            if (!speedingUp && !Recovering) BedtimeWater.FillBottles(cabins);
+            if (!SpeedingUp && !Recovering) BedtimeWater.FillBottles(cabins);
             BedtimeWater.ServeThirst(cabins);
             foreach (var p in world.Players) p.SleepingAt = 0;
             AnnounceDawn();
@@ -152,12 +153,12 @@ public sealed class SleepCycle(World world) {
 
     /// <summary>Adds ordinary simulation steps to a frame, leaving time for the next network update or draw.</summary>
     internal void Accelerate(float elapsed) {
-        if (!CanAccelerate()) { speedingUp = false; return; }
+        if (!CanAccelerate()) { SpeedingUp = false; return; }
         if (elapsed <= 0) return;
         long began = Stopwatch.GetTimestamp();
-        if (!speedingUp) {
+        if (!SpeedingUp) {
             BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
-            speedingUp = true;
+            SpeedingUp = true;
         }
         // Do not accumulate work during a slow frame: do what fits now and leave the next frame its own budget.
         float extra = Math.Min(elapsed, SleepStep) * (TargetRate - 1);
@@ -172,7 +173,7 @@ public sealed class SleepCycle(World world) {
         } finally {
             AdvancingTime = false;
         }
-        if (!CanAccelerate()) speedingUp = false;
+        if (!CanAccelerate()) SpeedingUp = false;
     }
 
     /// <summary>Advances to dawn from the recovery screen when nobody is able to play.</summary>

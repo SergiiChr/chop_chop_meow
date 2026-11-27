@@ -1561,6 +1561,7 @@ Day and night have their own music, which crossfades as the time changes and pic
 The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
 The campfire musicians and listeners stay in time with the recording even in a long-running settlement.
 When play pauses, so does the campfire song, and the soundtrack returns until play resumes.
+The soundtrack also plays in place of the campfire recordings while sleep speeds up time.
 The music volume setting also controls campfire songs and solo sounds.
 
 ## Limitations

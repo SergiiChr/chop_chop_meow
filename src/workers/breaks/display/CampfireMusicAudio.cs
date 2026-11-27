@@ -6,8 +6,6 @@ namespace ChopChopMeow;
 
 /// <summary>Plays the campfire recordings at the parts of the songs and solos the world has reached.</summary>
 internal sealed class CampfireMusicAudio {
-    // Normal updates arrive thirty times a second. A world that has held still this long is waiting or paused.
-    private const float HoldAfter = .15f;
     private const float SeekDrift = .2f;
     // Normal snapshot and physics delays must not make playback skip the attack of a kick or strum.
     private const float StartWindow = .08f;
@@ -20,7 +18,7 @@ internal sealed class CampfireMusicAudio {
     private readonly Dictionary<Source, Voice> playing = new(World.MaxWorkers);
     private readonly Dictionary<Source, Cue> audible = new(World.MaxWorkers);
     private readonly Stack<Voice> free = new(World.MaxWorkers);
-    private float time = float.NegativeInfinity, heldFor;
+    private float time = float.NegativeInfinity;
 
     public CampfireMusicAudio(Func<AudioStreamPlayer3D> placeVoice, float reach) {
         this.reach = reach;
@@ -40,13 +38,17 @@ internal sealed class CampfireMusicAudio {
     }
 
     /// <summary>Follows the world snapshot and returns the share of the day or night soundtrack still wanted.</summary>
-    public float Update(World world, float dt, bool paused, float musicVolume, float volume) {
-        heldFor = world.Time == time ? heldFor + dt : 0;
+    public float Update(World world, bool paused, float musicVolume, float volume) {
+        var state = world.CampfireMusic.State;
+        if (world.Remote ? state.Playback == CampfirePlayback.FastForwarding : world.Sleep.SpeedingUp) {
+            Stop();
+            return 1;
+        }
+        bool clockMoved = world.Time != time;
         time = world.Time;
-        paused |= heldFor >= HoldAfter;
+        paused |= world.Remote && state.Playback == CampfirePlayback.Paused;
         audible.Clear();
         float loudestSong = 0;
-        var state = world.CampfireMusic.State;
         var listener = world.Player;
         foreach (var (fire, song) in state.Songs) {
             if (!PlayingSong(song) || world.Find(fire) is not { } site) continue;
@@ -73,7 +75,7 @@ internal sealed class CampfireMusicAudio {
                 if (paused || !free.TryPop(out voice)) continue;
                 playing.Add(source, voice);
             }
-            voice.Follow(cue, time - cue.StartsAt, speed, paused);
+            voice.Follow(cue, time - cue.StartsAt, speed, paused, clockMoved);
         }
         return paused ? 1 : 1 - loudestSong;
     }
@@ -97,15 +99,13 @@ internal sealed class CampfireMusicAudio {
         float offset = world.Time - startsAt;
         if (offset < 0 || !playing.TryGetValue(source, out var voice) || !voice.Matches(clip.Stream, startsAt)) return offset;
         if (!voice.Heard) return voice.WaitingForOnset && offset < SeekDrift ? 0 : offset;
-        float audio = voice.HeardAt(outputLatency);
-        if (Math.Abs(offset - audio) <= SeekDrift) return audio;
-        return offset;
+        return voice.HeardAt(outputLatency);
     }
 
     public void Stop() {
         foreach (var (source, voice) in playing) Release(source, voice);
+        audible.Clear();
         time = float.NegativeInfinity;
-        heldFor = 0;
     }
 
     private void Release(Source source, Voice voice) {
@@ -127,7 +127,7 @@ internal sealed class CampfireMusicAudio {
 
         public bool Matches(AudioStream? clip, float start) => stream == clip && startedAt == start;
 
-        public void Follow(Cue cue, float offset, float speed, bool paused) {
+        public void Follow(Cue cue, float offset, float speed, bool paused, bool clockMoved) {
             player.Position = new Vector3(cue.At.X, 0, cue.At.Y);
             player.VolumeDb = cue.Volume;
             if (paused) { player.StreamPaused = true; return; }
@@ -144,7 +144,7 @@ internal sealed class CampfireMusicAudio {
                 // A placed voice starts on the next physics frame. Give it time to mix before correcting its clock.
                 if (player.HasStreamPlayback()) {
                     WaitingForOnset = false;
-                    if (Math.Abs(offset - seekAt) > SeekDrift && Math.Abs(Position - offset) > SeekDrift) {
+                    if (clockMoved && Math.Abs(offset - seekAt) > SeekDrift && Math.Abs(Position - offset) > SeekDrift) {
                         seekAt = offset; player.Seek(offset);
                     }
                 }

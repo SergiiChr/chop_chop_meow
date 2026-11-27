@@ -27,7 +27,7 @@ internal readonly record struct CampfireMusicView(CampfireInstrument Instrument,
             float weight = Mathf.SmoothStep(-.18f, 0, soloTime) * Mathf.SmoothStep(0, .07f, clip.Duration - soloTime);
             return new(seat.Instrument, weight, Beat: Mathf.PosMod(soloTime / .74f, 1));
         }
-        var (playing, phase) = Strike(clip.Hits, soloTime);
+        var (playing, phase) = Strike(clip.Contacts, soloTime);
         return new(seat.Instrument, playing, Beat: phase);
     }
 
@@ -39,13 +39,13 @@ internal readonly record struct CampfireMusicView(CampfireInstrument Instrument,
         return Mathf.PosMod((elapsed - beats[previous]) / (beats[previous + 1] - beats[previous]), 1);
     }
 
-    private static (float Playing, float Beat) Strike(ReadOnlySpan<float> hits, float elapsed) {
+    private static (float Playing, float Beat) Strike(ReadOnlySpan<float> contacts, float elapsed) {
         const float gather = .18f, returnToRest = .28f;
-        int next = hits.BinarySearch(elapsed);
+        int next = contacts.BinarySearch(elapsed);
         if (next >= 0) return (1, 0);
         next = ~next;
-        float since = next > 0 ? elapsed - hits[next - 1] : float.PositiveInfinity;
-        float until = next < hits.Length ? hits[next] - elapsed : float.PositiveInfinity;
+        float since = next > 0 ? elapsed - contacts[next - 1] : float.PositiveInfinity;
+        float until = next < contacts.Length ? contacts[next] - elapsed : float.PositiveInfinity;
         if (since + until <= gather + returnToRest) return (1, since / (since + until));
         if (since < returnToRest) return (1 - Mathf.SmoothStep(.10f, returnToRest, since), since / (2 * returnToRest));
         if (until < gather) return (1 - Mathf.SmoothStep(.06f, gather, until), 1 - until / (2 * gather));

@@ -314,7 +314,7 @@ public partial class Net : Node {
         }
         World.Arrive(key, id); windows[id] = window;
         // The welcome is the guest's first update, which later ones build on.
-        var entries = Remember(updates.Capture(World));
+        var entries = Remember(updates.Capture(World, Held));
         acked[id] = sequence;
         var world = updates.Delta(entries, null).ToArray();
         var fog = WorldUpdates.Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered });
@@ -527,7 +527,7 @@ public partial class Net : Node {
     /// <summary>Server: sends each player what changed since the last update they confirmed.</summary>
     public void SendUpdates() {
         if (World.Players.Count == 0) return;
-        var entries = Remember(updates.Capture(World));
+        var entries = Remember(updates.Capture(World, Held));
         // Guests that confirmed the same update get the same changes.
         int builtOn = -1; byte[] delta = [];
         foreach (var p in World.Players) {

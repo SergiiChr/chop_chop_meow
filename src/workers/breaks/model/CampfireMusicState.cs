@@ -1,18 +1,20 @@
+using System;
 using System.Collections.Generic;
 
 namespace ChopChopMeow;
 
 /// <summary>The live campfire music shared with guests, not part of a save.</summary>
-internal sealed class CampfireMusicState {
-    public Dictionary<int, CampfireSeatMusic> Seats { get; set; } = new();
-    public Dictionary<int, CampfireSong> Songs { get; set; } = new();
+internal readonly record struct CampfireMusicState(
+    Dictionary<int, CampfireSeatMusic> Seats, Dictionary<int, CampfireSong> Songs,
+    CampfirePlayback Playback = CampfirePlayback.Normal) {
+    public CampfireMusicState() : this(new(), new()) { }
 
     /// <summary>Whether the shared seats and recordings use known instruments, tracks and clock times.</summary>
     internal bool Valid() {
-        if (Seats == null || Songs == null) return false;
+        if (Seats == null || Songs == null || !Enum.IsDefined(Playback)) return false;
         var brought = new HashSet<(int Fire, CampfireInstrument Instrument)>();
         foreach (var (id, seat) in Seats)
-            if (id <= 0 || seat.Fire <= 0 || !System.Enum.IsDefined(seat.Instrument) || seat.Solo < 0 ||
+            if (id <= 0 || seat.Fire <= 0 || !Enum.IsDefined(seat.Instrument) || seat.Solo < 0 ||
                 seat.Solo > CampfireScore.SoloCount(seat.Instrument) || !float.IsFinite(seat.SoloAt) || seat.SoloAt < 0 ||
                 seat.Instrument != CampfireInstrument.None && !brought.Add((seat.Fire, seat.Instrument)))
                 return false;
