@@ -146,7 +146,7 @@ internal static class SetupSteps {
     /// <summary>Sets exact market values, so a load that restores them cannot pass on a default.</summary>
     public static void SetMarket(World world, string item, float price, float demand) { world.S.Prices[item] = price; world.S.Demand[item] = demand; }
 
-    /// <summary>Moves the clock without running the settlement, to set its age or make market news older.</summary>
+    /// <summary>Moves the clock without running the settlement, so a check can start at a chosen time.</summary>
     public static void SkipClock(World world, float seconds) => world.S.Time += seconds;
 
     /// <summary>Eats or drinks an item from one backpack cell, as a hotbar slot bound to that stack does.</summary>

@@ -40,7 +40,8 @@ internal sealed class CampfireMusicAudio {
     /// <summary>Follows the world snapshot and returns the share of the day or night soundtrack still wanted.</summary>
     public float Update(World world, bool paused, float musicVolume, float volume) {
         var state = world.CampfireMusic.State;
-        if (world.Remote ? state.Playback == CampfirePlayback.FastForwarding : world.Sleep.SpeedingUp) {
+        bool fastForwarding = world.Remote ? state.Playback == CampfirePlayback.FastForwarding : world.Sleep.SpeedingUp;
+        if (musicVolume <= 0 || fastForwarding) {
             Stop();
             return 1;
         }
@@ -48,16 +49,14 @@ internal sealed class CampfireMusicAudio {
         time = world.Time;
         paused |= world.Remote && state.Playback == CampfirePlayback.Paused;
         audible.Clear();
-        float loudestSong = 0;
         var listener = world.Player;
         foreach (var (fire, song) in state.Songs) {
             if (!PlayingSong(song) || world.Find(fire) is not { } site) continue;
             var at = site.Pos;
             float gain = Math.Clamp((reach - listener.DistanceTo(at)) / (reach - World.FireReach), 0, 1);
-            if (gain > 0 && Add(new Source(fire, true), songs[song.Track], song.StartsAt, at, gain, volume))
-                loudestSong = Math.Max(loudestSong, gain);
+            if (gain > 0) Add(new Source(fire, true), songs[song.Track], song.StartsAt, at, gain, volume);
         }
-        if (musicVolume > 0 && state.Seats.Count > 0) {
+        if (state.Seats.Count > 0) {
             foreach (var worker in world.Workers) {
                 if (!state.Seats.TryGetValue(worker.Id, out var seat) || seat.Solo <= 0 ||
                     state.Songs.TryGetValue(seat.Fire, out var song) && PlayingSong(song)) continue;
@@ -67,15 +66,16 @@ internal sealed class CampfireMusicAudio {
                     fraction * fraction, volume + SoloDb);
             }
         }
-        if (musicVolume <= 0) audible.Clear();
         foreach (var (source, voice) in playing) if (!audible.ContainsKey(source)) Release(source, voice);
         float speed = world.Remote ? 1 : (float)Engine.TimeScale;
+        float loudestSong = 0;
         foreach (var (source, cue) in audible) {
             if (!playing.TryGetValue(source, out var voice)) {
                 if (paused || !free.TryPop(out voice)) continue;
                 playing.Add(source, voice);
             }
             voice.Follow(cue, time - cue.StartsAt, speed, paused, clockMoved);
+            if (source.Song && !voice.Finished) loudestSong = Math.Max(loudestSong, cue.Gain);
         }
         return paused ? 1 : 1 - loudestSong;
     }
@@ -83,11 +83,10 @@ internal sealed class CampfireMusicAudio {
     private bool PlayingSong(CampfireSong song) =>
         song.Track > 0 && time >= song.StartsAt && time - song.StartsAt < songs[song.Track].Duration;
 
-    private bool Add(Source source, Clip clip, float startsAt, Vector2 at, float gain, float volume) {
+    private void Add(Source source, Clip clip, float startsAt, Vector2 at, float gain, float volume) {
         float offset = time - startsAt;
-        if (clip.Stream == null || offset < 0 || offset >= clip.Duration) return false;
-        audible.Add(source, new Cue(clip.Stream, startsAt, at, volume + Mathf.LinearToDb(gain)));
-        return true;
+        if (clip.Stream == null || offset < 0 || offset >= clip.Duration) return;
+        audible.Add(source, new Cue(clip.Stream, startsAt, at, gain, volume + Mathf.LinearToDb(gain)));
     }
 
     public float SongTime(World world, int fire, CampfireSong song) => TimeHeard(world, new Source(fire, true), songs[song.Track], song.StartsAt);
@@ -98,8 +97,7 @@ internal sealed class CampfireMusicAudio {
     private float TimeHeard(World world, Source source, Clip clip, float startsAt) {
         float offset = world.Time - startsAt;
         if (offset < 0 || !playing.TryGetValue(source, out var voice) || !voice.Matches(clip.Stream, startsAt)) return offset;
-        if (!voice.Heard) return voice.WaitingForOnset && offset < SeekDrift ? 0 : offset;
-        return voice.HeardAt(outputLatency);
+        return voice.Finished ? clip.Duration : voice.TimeHeard(outputLatency, offset);
     }
 
     public void Stop() {
@@ -114,16 +112,22 @@ internal sealed class CampfireMusicAudio {
 
     private readonly record struct Source(int Id, bool Song);
     private readonly record struct Clip(float Duration, AudioStream? Stream);
-    private readonly record struct Cue(AudioStream Stream, float StartsAt, Vector2 At, float Volume);
+    private readonly record struct Cue(AudioStream Stream, float StartsAt, Vector2 At, float Gain, float Volume);
 
     private sealed class Voice(AudioStreamPlayer3D player) {
         private AudioStream? stream;
         private float startedAt, seekAt;
-        public bool WaitingForOnset { get; private set; }
-        public bool Heard => player.Playing && !player.StreamPaused && player.HasStreamPlayback();
+        private float heardAt = float.NegativeInfinity;
+        private bool waitingForOnset;
+        public bool Finished => stream != null && !player.Playing && !player.StreamPaused;
         private float Position => player.GetPlaybackPosition() + (float)AudioServer.GetTimeSinceLastMix() * player.PitchScale;
 
-        public float HeardAt(float latency) => Position - latency * player.PitchScale;
+        public float TimeHeard(float latency, float offset) {
+            if (player.Playing && !player.StreamPaused && player.HasStreamPlayback())
+                heardAt = Math.Max(heardAt, Position - latency * player.PitchScale);
+            if (float.IsFinite(heardAt)) return heardAt;
+            return waitingForOnset && offset < SeekDrift ? 0 : offset;
+        }
 
         public bool Matches(AudioStream? clip, float start) => stream == clip && startedAt == start;
 
@@ -138,13 +142,15 @@ internal sealed class CampfireMusicAudio {
                 player.Stream = stream = cue.Stream;
                 startedAt = cue.StartsAt;
                 seekAt = offset;
-                WaitingForOnset = offset <= StartWindow;
-                player.Play(WaitingForOnset ? 0 : offset);
+                heardAt = float.NegativeInfinity;
+                waitingForOnset = offset <= StartWindow;
+                player.Play(waitingForOnset ? 0 : offset);
             } else {
                 // A placed voice starts on the next physics frame. Give it time to mix before correcting its clock.
                 if (player.HasStreamPlayback()) {
-                    WaitingForOnset = false;
-                    if (clockMoved && Math.Abs(offset - seekAt) > SeekDrift && Math.Abs(Position - offset) > SeekDrift) {
+                    waitingForOnset = false;
+                    // Catch up to a newer world position, but never repeat sound and movement the player already heard.
+                    if (clockMoved && offset - seekAt > SeekDrift && offset - Position > SeekDrift) {
                         seekAt = offset; player.Seek(offset);
                     }
                 }
