@@ -310,7 +310,8 @@ public static class HaulingChecks {
         world.SetFilter(post, crate, false, true);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 10)));
         var worker = AddWorker(world, new Vector2(15, 12));
-        worker.Bag.Add(PackCrate(world, ("berries", 12)), 1);
+        string packed = PackCrate(world, ("berries", 12));
+        world.Player = worker.Pos; world.Transfer(world.Backpack, worker.Bag, packed, 1);
         world.Tick(.1f);
         Require(worker.Destination == post.Id, "a worker should carry a crate of berries to the trading post asking for it");
         world.ClearFilters(post);

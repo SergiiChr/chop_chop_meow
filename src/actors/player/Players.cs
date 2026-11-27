@@ -226,7 +226,7 @@ public sealed partial class World {
     /// </summary>
     public int Locate(Inventory inventory) {
         if (inventory == S.Backpack) return 0;
-        foreach (var pair in S.Crates) if (pair.Value == inventory && CarriedCrate(pair.Key) != null) return CrateCode - pair.Key;
+        foreach (var slot in S.Backpack.Layout) if (slot.Units is [{ Kind: Crate } crate] && crate.Contents == inventory) return CrateCode - crate.Id;
         foreach (var w in S.Workers) if (inventory == w.Bag || inventory == w.ToolSlot) return w.Id * BoxCodes + (inventory == w.Bag ? 1 : 2);
         foreach (var t in S.Things) if (BoxIndex(t, inventory) is int box and >= 0) return t.Id * BoxCodes + box + 1;
         return -1;
@@ -243,7 +243,7 @@ public sealed partial class World {
         for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i) == inventory) return i;
         return -1;
     }
-    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null)
+    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) is string crate ? S.Backpack.Object(crate)?.Contents : null)
         : Find(at / BoxCodes) is Thing t ? Box(t, at % BoxCodes - 1) : Carrier(at) is Worker w ? (at % BoxCodes == 1 ? w.Bag : at % BoxCodes == 2 ? w.ToolSlot : null) : null;
 
     /// <summary>The worker a number from <see cref="Locate"/> names the hands or the tool slot of, or null.</summary>
@@ -344,7 +344,7 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        item = ChopChopMeow.Item.KindOf(item);
+        item = IsPacked(item) ? FilterEntryOf(item) : ChopChopMeow.Item.KindOf(item);
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;

@@ -62,14 +62,8 @@ internal sealed class TakeBack(World world) {
         ThingKind.Farm => world.Data.Farm.Yield.ContainsKey(item) ? t.Output : null,
         // A mine's output shows on its page only once the mine opens.
         ThingKind.Mine => t.MineStage == MineStage.Open && (item == Mines.Ore(t) || item == "stone") ? t.Output : null,
-        ThingKind.Packer => t.Packs != "" && CrateOfGood(item, t.Packs) ? t.Output : null,
-        ThingKind.Chest or ThingKind.Pile or ThingKind.Crate or ThingKind.Toolstation => t.Inventory.AllowsWithdrawal(item) && world.Holds(t, item) && !World.Nests(t, item) ? t.Inventory : null,
+        ThingKind.Packer => t.Packs != "" && World.PackedGood(t.Output!.Object(item)) == t.Packs ? t.Output : null,
+        ThingKind.Chest or ThingKind.Pile or ThingKind.Crate or ThingKind.Toolstation => t.Inventory.AllowsWithdrawal(item) && world.Holds(t, item, t.Inventory.Object(item)) && !World.Nests(t, item) ? t.Inventory : null,
         _ => null
     };
-
-    /// <summary>Whether an item is a packed crate of one good, compared without building the crate's name.</summary>
-    private static bool CrateOfGood(string item, string good) {
-        var kind = World.PackedKind(item);
-        return kind.Length == World.PackedPrefix.Length + good.Length && kind.EndsWith(good, StringComparison.Ordinal);
-    }
 }

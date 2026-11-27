@@ -55,7 +55,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         kit.LinkRecipeMap(cell, () => "crate");
         column.AddChild(cell);
         var fill = Style.PerBatch(""); column.AddChild(fill);
-        live.Watch(() => output.First() is string crate ? world.Packed(crate)?.Count ?? 0 : -1, packed => {
+        live.Watch(() => output.First() is string crate ? output.Object(crate)?.Contents?.Count ?? 0 : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
             string label = packed == 0 ? "Empty crate · take it out to keep packing" : packed == world.Data.CrateCapacity ? "Full crate" : "Crate being packed";
             cell.TooltipText = packed < 0 ? "The crate being packed shows here" : $"{label}\n{StationSlots.SlotHint}";

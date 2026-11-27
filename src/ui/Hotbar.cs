@@ -148,7 +148,7 @@ public partial class Hotbar : PanelContainer {
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
             bool lantern = Lanterns.IsItem(id);
             int bugs = count > 0 && lantern ? Lanterns.BugCount(world.S.Backpack, id) : -1;
-            var shown = (id, count, active, life, bugs, World.IsCrate(id) ? world.Packed(id)?.Count ?? 0 : 0);
+            var shown = (id, count, active, life, bugs, World.IsPacked(id) ? world.S.Backpack.Object(id)?.Contents?.Count ?? 0 : 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);

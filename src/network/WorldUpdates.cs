@@ -13,7 +13,7 @@ namespace ChopChopMeow;
 
 /// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one entry shared by all players.</summary>
 public readonly record struct EntryKey(byte Prefix, int Id) {
-    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Pipes = (byte)'u', PipeWater = (byte)'v', PipeJam = (byte)'j', Crates = (byte)'c', Sand = (byte)'b';
+    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Pipes = (byte)'u', PipeWater = (byte)'v', PipeJam = (byte)'j', Sand = (byte)'b';
     /// <summary>A changed entry that carries only its changed fields is named with this in front.</summary>
     public const byte Patched = (byte)'~';
     /// <summary>Longest name: a patch mark, a prefix, a colon and an int.</summary>
@@ -51,7 +51,7 @@ public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
 public sealed class WorldUpdates {
     private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
     // Entries shared separately from the state, and the fog each machine works out.
-    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths), nameof(SaveState.StrippedSand), nameof(SaveState.SteelPipes), nameof(SaveState.PipeWater), nameof(SaveState.PipeJam), nameof(SaveState.Crates) }.ToHashSet();
+    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths), nameof(SaveState.StrippedSand), nameof(SaveState.SteelPipes), nameof(SaveState.PipeWater), nameof(SaveState.PipeJam) }.ToHashSet();
     // The state entry carries every field except those sent separately and the fog, which each machine works out.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
@@ -117,7 +117,6 @@ public sealed class WorldUpdates {
         Write(snapshot, new EntryKey(EntryKey.Pipes, 0), s.SteelPipes, UpdateJson.Default.DictionaryInt32PipeTile);
         Write(snapshot, new EntryKey(EntryKey.PipeWater, 0), s.PipeWater, UpdateJson.Default.DictionaryInt32Double);
         Write(snapshot, new EntryKey(EntryKey.PipeJam, 0), s.PipeJam, UpdateJson.Default.DictionaryInt32Double);
-        Write(snapshot, new EntryKey(EntryKey.Crates, 0), s.Crates, UpdateJson.Default.DictionaryInt32Inventory);
         foreach (var t in s.Things) Write(snapshot, new EntryKey(EntryKey.Thing, t.Id), t, UpdateJson.Default.Thing);
         foreach (var w in s.Workers) Write(snapshot, new EntryKey(EntryKey.Worker, w.Id), w, UpdateJson.Default.Worker);
         foreach (var w in s.Wolves) Write(snapshot, new EntryKey(EntryKey.Wolf, w.Id), w, UpdateJson.Default.Wolf);

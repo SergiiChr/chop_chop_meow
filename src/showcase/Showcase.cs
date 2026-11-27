@@ -366,12 +366,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         // Three packed crates leave on the cart, so it should show three crates.
         foreach (var goods in new[] { "steel_axe", "berries", "raw_meat" }) {
             var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add(goods, goods == "steel_axe" ? 2 : 12); world.PickUpCrate(box);
-            world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
+            world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(World.IsPacked), 1);
         }
         world.Sell(sign); world.Orders[0].Elapsed = 4;
         world.S.Making = "planks"; world.S.Crafting.Add(new Queued { Recipe = "wood_parts", Count = 3 }); world.S.CraftTime = 6;
         var meat = world.Add(ThingKind.Crate, world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
-        world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
+        world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(World.IsPacked), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (Launch.Has("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
         if (Launch.Value("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);

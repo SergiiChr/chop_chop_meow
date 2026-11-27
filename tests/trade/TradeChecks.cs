@@ -205,10 +205,10 @@ public static class TradeChecks {
         world.Player = sign.Pos;
         string chisel = PackCrate(world, ("steel_chisel", 1));
         string empty = PackCrate(world);
-        Require(world.CanSell(chisel), "the village should take a crate of goods it does not buy as a donation");
-        Require(!world.CanSell(empty), "the village should not take an empty crate");
-        Require(!world.CanSell("crate"), "the village should not take a bare crate");
-        Require(!world.CanSell("steel_axe"), "the village should not take a loose steel axe");
+        Require(World.CanSell(chisel), "the village should take a crate of goods it does not buy as a donation");
+        Require(!World.CanSell(empty), "the village should not take an empty crate");
+        Require(!World.CanSell("crate"), "the village should not take a bare crate");
+        Require(!World.CanSell("steel_axe"), "the village should not take a loose steel axe");
         string meat = PackCrate(world, ("raw_meat", 6), ("burnt_steak", 6));
         string tools = PackCrate(world, ("steel_hammer", 1), ("steel_pick", 1));
         world.Player = sign.Pos;

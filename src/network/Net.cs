@@ -596,7 +596,6 @@ public partial class Net : Node {
                 throw new JsonException("Invalid steel pipes or their liquids.");
             s.SteelPipes = layout; s.PipeWater = stored; s.PipeJam = storedJam;
         }
-        if (Changed(entries, new EntryKey(EntryKey.Crates, 0)) is byte[] crates) s.Crates = WorldUpdates.Read<Dictionary<int, Inventory>>(crates);
         var me = World.Me;
         // This machine walks its own player and keeps its selection; only a move the simulation made, such as a respawn, comes back.
         // Hotbar slots come from the server, which binds them to backpack stacks.

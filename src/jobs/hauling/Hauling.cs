@@ -34,7 +34,7 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
         if (c.From == c.To) box.TransferTo(c.To!.Inventory, c.Item, Math.Min(c.Count, c.To.Inventory.SlotRoom(c.Item)), true);
         else {
             // A load carried out is sized again at pickup, since where it goes may have filled while the hauler walked here.
-            int count = c.From == place && c.DrainLiquid == null ? Takes(world, c.To!, c.Item, c.Count) : c.Count;
+            int count = c.From == place && c.DrainLiquid == null ? Takes(world, c.To!, c.Item, c.Count, box.Object(c.Item)) : c.Count;
             w.DrainingLiquid = box.TransferTo(w.Bag, c.Item, count, true) > 0 ? c.DrainLiquid : null;
             w.Destination = c.To!.Id; w.Fueling = c.Fuel;
         }
@@ -43,8 +43,9 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
     }
 
     /// <summary>How many of the free units of an item a place a load goes to takes, as far as it has room; vessels that pour there go as many as its liters of room take.</summary>
-    internal static int Takes(World world, Thing to, string item, int free) {
-        if (world.Intake(to, item, false) is not (Inventory into, int room)) return 0;
+    /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate.</param>
+    internal static int Takes(World world, Thing to, string item, int free, Item? unit = null) {
+        if (world.Intake(to, item, false, unit) is not (Inventory into, int room)) return 0;
         if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
         return Math.Min(free, room);
     }
@@ -84,7 +85,7 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
     /// <summary>Whether a carry a hauler set out on can still be made: its places stand, the load is still there to take and where it goes still takes it.</summary>
     private bool Stands(in Carry c) =>
         world.Find(c.Place!.Id) == c.Place && world.Find(c.From!.Id) == c.From && world.Find(c.To!.Id) == c.To && BoxOf(c).Free(c.Item) > 0
-        && (c.From == c.To ? c.To.Inventory.SlotRoom(c.Item) > 0 : c.DrainLiquid is string liquid ? world.CanDrain(c.To, c.Item, liquid) : world.Intake(c.To, c.Item, c.Fuel) != null);
+        && (c.From == c.To ? c.To.Inventory.SlotRoom(c.Item) > 0 : c.DrainLiquid is string liquid ? world.CanDrain(c.To, c.Item, liquid) : world.Intake(c.To, c.Item, c.Fuel, BoxOf(c).Object(c.Item)) != null);
 
     /// <summary>What a hauler with nothing to carry says: what the place lacks, or for a haul group its first place.</summary>
     private string Wait(JobEntry job) {

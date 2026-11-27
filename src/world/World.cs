@@ -328,8 +328,6 @@ public sealed class SaveState {
     public int NextId { get; set; } = 1;
     public int WageDay { get; set; } = 1;
     [JsonIgnore] public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
-    /// <summary>Contents of crates packed into items, keyed by the number in their item id.</summary>
-    public Dictionary<int, Inventory> Crates { get; set; } = new();
     [JsonIgnore] public List<Queued> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
     [JsonIgnore] public string Making { get => Actor.Making; set => Actor.Making = value; }
     [JsonIgnore] public float CraftTime { get => Actor.CraftTime; set => Actor.CraftTime = value; }
@@ -1547,7 +1545,7 @@ public sealed partial class World {
         return Pay(amount);
     }
     /// <summary>The village takes any packed crate that holds something; goods it does not buy go as donations.</summary>
-    public bool CanSell(string item) => Packed(item) is { Count: > 0 };
+    public static bool CanSell(string item) => IsPacked(item);
     private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
     public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Market.Goods[item].Price;
@@ -1565,7 +1563,7 @@ public sealed partial class World {
     }
     /// <summary>Sends the cart once every market slot holds a crate, for a post set to sell on its own.</summary>
     private void AutoSell(Thing sign) {
-        if (sign.AutoSell && sign.Inventory.Room(PackedPrefix) == 0 && S.Orders.Count < Carts) Ship(sign);
+        if (sign.AutoSell && sign.Inventory.Room(AnyPacked) == 0 && S.Orders.Count < Carts) Ship(sign);
     }
     /// <summary>Crates with goods that can still be sent to the village.</summary>
     internal int OutboundCrates(Thing sign) {
@@ -1578,11 +1576,11 @@ public sealed partial class World {
         if (sign.Kind != ThingKind.Signpost || Busy() || Forwarded(Verb.AutoSell, sign.Id, count: on ? 1 : 0)) return;
         sign.AutoSell = on;
     }
-    /// <summary>The goods packed in these crates, added up by kind.</summary>
-    public Dictionary<string, int> Contents(IEnumerable<string> crates) {
+    /// <summary>The goods packed in these crates of a box, added up by kind.</summary>
+    public static Dictionary<string, int> Contents(Inventory box, IEnumerable<string> crates) {
         var goods = new Dictionary<string, int>();
         foreach (var crate in crates)
-            if (Packed(crate) is Inventory packed) foreach (var (item, quantity) in packed.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
+            if (box.Object(crate)?.Contents is Inventory packed) foreach (var (item, quantity) in packed.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
         return goods;
     }
     /// <summary>What a sale pays at the given unit prices: every unit of a good the village takes, plus the crates, which go with the goods.</summary>
@@ -1596,12 +1594,12 @@ public sealed partial class World {
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
         int empty = sign.Inventory["crate"];
         if (crates.Count == 0 && empty == 0) return false;
-        var goods = Contents(crates);
+        var goods = Contents(sign.Inventory, crates);
         if (empty > 0) { goods["crate"] = goods.GetValueOrDefault("crate") + empty; sign.Inventory.Remove("crate", empty); }
         // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
         float price = SaleValue(goods, crates.Count, item => UnitPrice(item, false));
         foreach (var (item, quantity) in goods) if (VillageBuys(item)) S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
-        foreach (var crate in crates) { sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate)); }
+        foreach (var crate in crates) sign.Inventory.TakeObject(crate);
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count + empty });
         Say($"Goods sent: {string.Join(", ", GoodsByKind(goods).Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
@@ -1628,37 +1626,40 @@ public sealed partial class World {
         Say($"Ordered {(Lot(item) > 1 ? $"{lots} {(lots == 1 ? "crate" : "crates")} of " : "")}{units} {Data.Name(item)} for {price} coins. Back in {Data.TradeSeconds:0} seconds."); return true;
     }
     // ---------- Crates ----------
-    /// <summary>
-    /// Packed crates are items named by this prefix and a number that keys their contents in <see cref="SaveState.Crates"/>.
-    /// A crate of one good also carries its name in between, such as <c>crate_bread_17</c>, so filters can ask for crates of it.
-    /// </summary>
+    /// <summary>An empty crate, a plain item; a crate holding goods is an <see cref="Item"/> object found by its key, such as <c>crate#17</c>.</summary>
+    public const string Crate = "crate";
+    /// <summary>A packed crate's key as a check of room sees it: one takes a cell of its own, and both of a worker's arms.</summary>
+    internal static readonly string AnyPacked = Item.KeyOf(Crate, 0);
+    /// <summary>What filter entries for packed crates start with: <see cref="CrateOf"/> a good, or <see cref="MixedCrate"/>.</summary>
     public const string PackedPrefix = "crate_";
-    public static bool IsCrate(string item) => item == "crate" || IsPacked(item);
+    public static bool IsCrate(string item) => item == Crate || IsPacked(item);
     /// <summary>Whether an item is a packed crate, one with goods in it.</summary>
-    public static bool IsPacked(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal);
-    /// <summary>Whether an item is a crate, empty or packed, going into a placed crate: no worker carries one there and no filter names one.</summary>
-    public static bool Nests(Thing t, string item) => t.Kind == ThingKind.Crate && IsCrate(item);
-    /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
-    public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
+    public static bool IsPacked(string item) => Item.IsKey(item) && Item.IsKind(item, Crate);
+    /// <summary>Whether an item or filter entry is a crate, empty or packed, going into a placed crate: no worker carries one there and no filter names one.</summary>
+    public static bool Nests(Thing t, string item) => t.Kind == ThingKind.Crate && (IsCrate(item) || item.StartsWith(PackedPrefix, StringComparison.Ordinal));
+    /// <summary>The number in a packed crate's key, or 0 for any other item.</summary>
+    public static int PackedId(string item) => IsPacked(item) ? Item.IdOf(item) : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
     /// <summary>The filter entry that stands for any packed crate of mixed goods; only a pile's filter names it.</summary>
     public const string MixedCrate = PackedPrefix;
-    /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, <see cref="MixedCrate"/> for a crate of mixed goods, or empty for anything else.</summary>
-    public static ReadOnlySpan<char> PackedKind(string item) {
-        if (!item.StartsWith(PackedPrefix, StringComparison.Ordinal)) return default;
-        int last = item.LastIndexOf('_');
-        return item.AsSpan(0, Math.Max(last, PackedPrefix.Length));
-    }
+    /// <summary>The one good a packed crate holds, the empty string for mixed goods, or null for anything but a packed crate.</summary>
+    internal static string? PackedGood(Item? unit) => unit?.Kind == Crate ? unit.SoleKind() : null;
+    /// <summary>Whether a filter entry from <see cref="CrateOf"/> or <see cref="MixedCrate"/> stands for crates of this good, compared without building the entry.</summary>
+    internal static bool NamesCrateOf(string entry, string good) =>
+        entry.Length == PackedPrefix.Length + good.Length && entry.StartsWith(PackedPrefix, StringComparison.Ordinal) && entry.EndsWith(good, StringComparison.Ordinal);
     /// <summary>The good a filter entry from <see cref="CrateOf"/> asks crates of, or null for any other entry.</summary>
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
-    /// <summary>What a pile's filter names for an item: the kind of crate for a packed crate of one good, a vessel's liquid for a vessel holding some, or the item itself, a <see cref="CrateOf"/> entry included.</summary>
-    public string PileEntry(string item) {
+    /// <summary>
+    /// What a pile's filter names for an item: the kind of crate for a packed crate, a vessel's liquid for a vessel holding some,
+    /// or the item itself, a <see cref="CrateOf"/> entry included.
+    /// </summary>
+    /// <param name="unit">The object the item's key finds, for a packed crate.</param>
+    public string PileEntry(string item, Item? unit = null) {
         string kindOfContainer = ContainerItem.Base(item);
         if (kindOfContainer is Barrel.Item or Bucket.Item or Lanterns.Item) return kindOfContainer;
         if (CrateGood(item) != null) return item;
-        var kind = PackedKind(item);
-        if (!kind.IsEmpty) return new string(kind);
+        if (PackedGood(unit) is string good) return good == "" ? MixedCrate : CrateOf(good);
         return Data.VesselOf(item) is VesselDef v && item != v.Empty ? v.Liquid : item;
     }
     /// <summary>The items a pile's filter lists for a <see cref="PileEntry"/>: every fill of a vessel that holds its liquid, or the entry itself.</summary>
@@ -1672,41 +1673,51 @@ public sealed partial class World {
     /// <summary>Whether a pile is a plain one, whose filter names one resource, rather than compost.</summary>
     public static bool IsPlainPile(Thing t) => t.Kind == ThingKind.Pile && !t.Compost;
     public static bool IsSingleResourceStore(Thing t) => IsPlainPile(t) || t.Kind == ThingKind.Barrel;
+    /// <summary>The filter entry an item stands under: the kind of crate for a packed crate, or the item itself.</summary>
+    /// <param name="unit">The object the item's key finds, for a packed crate.</param>
+    public static string FilterEntry(string item, Item? unit) => PackedGood(unit) is string good ? good == "" ? MixedCrate : CrateOf(good) : item;
     /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
     public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good))) : Data.Name(entry);
-    /// <summary>The contents of a packed crate item, or null for anything else.</summary>
-    public Inventory? Packed(string item) => S.Crates.GetValueOrDefault(PackedId(item));
+    /// <summary>
+    /// The goods in a packed crate, wherever in the world it is, or null for anything else.
+    /// It looks through every box, so code that knows the box holding the crate asks that box instead.
+    /// </summary>
+    public Inventory? Packed(string item) => IsPacked(item) ? FindObject(item)?.Contents : null;
+    /// <summary>The filter entry a packed crate stands under, wherever in the world it is, or the item itself.</summary>
+    public string FilterEntryOf(string item) => FilterEntry(item, FindObject(item));
+    /// <summary>The object a key finds, looked for in every box, the acting player's backpack first.</summary>
+    private Item? FindObject(string item) {
+        if (!Item.IsKey(item)) return null;
+        if (S.Backpack.Object(item) is { } carried) return carried;
+        foreach (var player in S.Players) if (player.Backpack.Object(item) is { } unit) return unit;
+        foreach (var player in S.Absent.Values) if (player.Backpack.Object(item) is { } unit) return unit;
+        foreach (var w in S.Workers) if ((w.Bag.Object(item) ?? w.ToolSlot.Object(item)) is { } unit) return unit;
+        foreach (var t in S.Things) for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i)?.Object(item) is { } unit) return unit;
+        return null;
+    }
     /// <summary>A crate's contents, empty, with a new chest's filters: nothing in, everything out.</summary>
     public Inventory NewCrate() {
         var crate = new Inventory { Slots = Data.CrateCapacity, StackSize = Data.CrateCapacity, Capacity = Data.CrateCapacity };
         crate.GateNew();
         return crate;
     }
-    /// <summary>Packs contents into a new crate item.</summary>
-    private string Pack(Inventory contents) {
-        int id = S.NextId++; S.Crates[id] = contents;
-        return PackedName(contents, id);
-    }
-    /// <summary>Names a crate by the kind of good it holds, even if its lanterns have different charges.</summary>
-    internal static string PackedName(Inventory contents, int id) {
-        string? good = null;
-        foreach (var pair in contents.Items) {
-            string kind = Item.KindOf(pair.Key);
-            if (good != null && good != kind) return PackedPrefix + id;
-            good = kind;
-        }
-        return good == null ? "crate" : $"{PackedPrefix}{good}_{id}";
-    }
+    /// <summary>A new packed crate holding these goods, for a box to take.</summary>
+    private Item Pack(Inventory contents) => new() { Kind = Crate, Id = S.NextId++, Contents = contents };
     /// <summary>An item's name, with what a packed crate holds.</summary>
-    /// <param name="box">The box holding it, where an object such as a lantern keeps what it says of itself.</param>
-    public string Describe(string item, Inventory? box = null) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(box?.Object(item))) : Data.Name(item);
+    /// <param name="box">The box holding it, where an object such as a crate or a lantern keeps what it says of itself.</param>
+    public string Describe(string item, Inventory? box = null) {
+        var unit = box?.Object(item);
+        return IsPacked(item) && (unit?.Contents ?? Packed(item)) is Inventory contents ? $"{Data.Name(Crate)} of {Goods(contents.Items)}"
+            : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(unit)) : Data.Name(item);
+    }
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
+        if (id == 0) return null;
         foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;
         return null;
     }
     /// <summary>
-    /// Moves items between a packed crate in the backpack and the backpack itself, then names the crate after what it holds, keeping its number.
+    /// Moves items between a packed crate in the backpack and the backpack itself; the crate keeps its number.
     /// An emptied crate becomes a plain empty crate.
     /// </summary>
     public int MoveInCrate(int id, string item, int quantity, bool packing) {
@@ -1714,25 +1725,23 @@ public sealed partial class World {
         if (packing && Barrel.Is(item)) { Say("Barrel does not fit in wood crate."); return 0; }
         if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
         if (id == 0) return packing ? PackEmptyCrate(item, quantity) : 0;
-        if (CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
+        if (CarriedCrate(id) is not string crate || S.Backpack.Object(crate)?.Contents is not Inventory contents) return 0;
         if (Busy() || Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
         int moved = packing ? S.Backpack.TransferTo(contents, item, quantity) : contents.TransferTo(S.Backpack, item, quantity);
         if (moved == 0) { Say(packing ? "The crate is full." : "Your backpack is full."); return 0; }
-        S.Backpack.Replace(crate, PackedName(contents, id));
-        if (contents.Count == 0) S.Crates.Remove(id);
+        S.Backpack.Unpack(crate);
         return moved;
     }
     /// <summary>Packs goods from the backpack into one of its empty crates, which becomes a packed crate; what <see cref="MoveInCrate"/> does with crate number 0.</summary>
     private int PackEmptyCrate(string item, int quantity) {
-        if (S.Backpack["crate"] == 0) { Say("No empty crate in your backpack."); return 0; }
+        if (S.Backpack[Crate] == 0) { Say("No empty crate in your backpack."); return 0; }
         if (Busy() || Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
         var contents = NewCrate();
         int moved = S.Backpack.TransferTo(contents, item, quantity);
         if (moved == 0) return 0;
-        S.Backpack.Remove("crate", 1);
-        string packed = Pack(contents);
-        if (S.Backpack.Add(packed, 1) == 1) return moved;
-        S.Crates.Remove(PackedId(packed)); S.Backpack.Add("crate", 1); contents.TransferTo(S.Backpack, item, moved);
+        S.Backpack.Remove(Crate, 1);
+        if (S.Backpack.Add(Pack(contents))) return moved;
+        S.Backpack.Add(Crate, 1); contents.TransferTo(S.Backpack, item, moved);
         Say("Your backpack is full.");
         return 0;
     }
@@ -1742,19 +1751,25 @@ public sealed partial class World {
         if (Construction.PlacementBlock(ThingKind.Crate, p, item, rotation) is string blocked) { Say(blocked); return null; }
         if (Busy() || Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p, rotation: rotation)) return null;
         // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
-        (MarkedSource ?? S.Backpack).Remove(item, 1);
+        var source = MarkedSource ?? S.Backpack;
+        Inventory? contents = null;
+        if (IsPacked(item)) {
+            if (source.TakeObject(item) is not { } unit) return null;
+            contents = unit.Contents;
+        } else if (source.Remove(Crate, 1) == 0) return null;
         var crate = Add(ThingKind.Crate, p, rotation: rotation); ClearGround(crate);
-        if (Packed(item) is Inventory contents) { ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
+        if (contents != null) { ReleaseIn(contents); crate.Inventory = contents; }
         Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate) {
         if (crate.Kind != ThingKind.Crate || !Near(crate)) return false;
         bool empty = crate.Inventory.Count == 0;
-        if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
+        if (S.Backpack.Room(empty ? Crate : AnyPacked) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         if (Busy() || Forwarded(Verb.PickUpCrate, crate.Id)) return true;
         if (HeldByOthers(crate)) return false;
-        S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
+        if (empty) S.Backpack.Add(Crate, 1); else S.Backpack.Add(Pack(crate.Inventory));
+        S.Things.Remove(crate);
         Play("wood_rocks_inventory", crate.Pos); PlayerActed?.Invoke(ActorAction.PickUp, crate.Pos); return true;
     }
     // ---------- Crafting ----------
@@ -1983,7 +1998,7 @@ public sealed partial class World {
     }
     private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
     /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools, buckets and bottles, a pile one resource, compost what rots and a campfire wood.</summary>
-    private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
+    private HoldRefusal HoldCheck(Thing t, string item, Item? unit = null) => t.Kind switch {
         ThingKind.Tree => TreePlanting.NeedsWater(t)
             ? (Barrels.CanPourWater(Data, item) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,
         ThingKind.Hole when item != TreePlanting.Acorn => HoldRefusal.AcornsOnly,
@@ -1996,7 +2011,7 @@ public sealed partial class World {
         ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
         _ when IsStation(t.Kind) && !SlotsTake(t, item) => HoldRefusal.NotUsed,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
-        ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item) => HoldRefusal.OtherResource,
+        ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item, unit) => HoldRefusal.OtherResource,
         ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) && !Barrels.CanPourWater(Data, item) => HoldRefusal.FarmOnly,
         ThingKind.Packer when item != "crate" && !IsProduct(t.Packs, item) => HoldRefusal.PackerOnly,
         ThingKind.Signpost when !CanSell(item) => HoldRefusal.SellOnly,
@@ -2004,9 +2019,12 @@ public sealed partial class World {
         _ => HoldRefusal.None
     };
     /// <summary>Whether storage takes an item, without building the reason; workers ask on every tick.</summary>
-    public bool Holds(Thing t, string item) => HoldCheck(t, item) == HoldRefusal.None;
+    /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate; without it, a key's object is looked for in every box.</param>
+    public bool Holds(Thing t, string item, Item? unit = null) => HoldCheck(t, item, unit ?? FindObject(item)) == HoldRefusal.None;
+    /// <summary>Whether a box's input filter lets in an item, a packed crate judged by its goods wherever it is.</summary>
+    public bool Accepts(Thing t, string item) => t.Inventory.Accepts(item, FindObject(item));
     /// <summary>Why storage will not take an item, or null.</summary>
-    public string? HoldBlock(Thing t, string item) => HoldCheck(t, item) switch {
+    public string? HoldBlock(Thing t, string item) => HoldCheck(t, item, FindObject(item)) switch {
         HoldRefusal.Barrel => $"Barrel does not fit in {Lower(Data.Name(t.Kind))}.",
         HoldRefusal.LiquidOnly => "A barrel can hold only one liquid at a time.",
         HoldRefusal.BarrelOnly => "The cabin slot only holds a steel barrel.",
@@ -2024,12 +2042,12 @@ public sealed partial class World {
         _ => null
     };
     /// <summary>Whether a pile takes an item: what its filter names, or with no filter yet, what it holds or anything while empty.</summary>
-    private bool PileTakes(Inventory pile, string item) {
-        if (pile.InputFilter.Count > 0) return pile.Wants(item);
-        return pile.First() is not string held || PileEntry(held) == PileEntry(item);
+    private bool PileTakes(Inventory pile, string item, Item? unit) {
+        if (pile.InputFilter.Count > 0) return pile.Wants(item, unit);
+        return pile.First() is not string held || PileEntry(held, pile.Object(held)) == PileEntry(item, unit);
     }
     /// <summary>The resource a plain pile is for, in lower case, as its filter names it or, until the next tick sets the filter, as it holds it.</summary>
-    public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held) : null)) is string entry ? Lower(FilterName(entry)) : null;
+    public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held, pile.Inventory.Object(held)) : null)) is string entry ? Lower(FilterName(entry)) : null;
     public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
     /// <summary>Turns a pile into compost or back; refused while it holds something the new use would not take.</summary>
     public bool SetCompost(Thing pile, bool on) {
@@ -2047,7 +2065,7 @@ public sealed partial class World {
     /// <summary>The first resource put in an unfiltered pile sets its filters, in and out; they then stay, emptied or not, until the player takes them off. Compost keeps the filters it was given.</summary>
     internal void PileFilters(Thing pile) {
         if (pile.Compost || pile.Inventory.InputFilter.Count > 0 || pile.Inventory.First() is not string item) return;
-        SetPileFilter(pile, PileEntry(item));
+        SetPileFilter(pile, PileEntry(item, pile.Inventory.Object(item)));
     }
     /// <summary>Makes a pile's filters, in and out, name the items of one <see cref="PileEntry"/>.</summary>
     private void SetPileFilter(Thing thing, string entry) {
@@ -2075,23 +2093,27 @@ public sealed partial class World {
     // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
     private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate, ThingKind.Signpost, ThingKind.Packer };
     /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage taking everything, and compost last for food.</summary>
-    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => Deposit(item, origin, exclude, askersOnly: false, storesTake: true);
+    /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate, whose goods decide where it goes; without it, a key's object is looked for in every box.</param>
+    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0, Item? unit = null) => Deposit(item, origin, exclude, askersOnly: false, storesTake: true, unit ?? FindObject(item));
     /// <summary>
     /// The nearest place asking for an item that a chest's or crate's hauler carries out to, or null.
     /// Storage taking everything does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
     /// </summary>
-    internal Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, askersOnly: true, storesTake: !store.Inventory.Wants(item));
+    internal Thing? AskerFor(string item, Thing store) {
+        var unit = store.Inventory.Object(item);
+        return Deposit(item, store.Pos, store.Id, askersOnly: true, storesTake: !store.Inventory.Wants(item, unit), unit);
+    }
     /// <param name="askersOnly">Only places asking for the item count, not storage taking everything nor compost.</param>
     /// <param name="storesTake">Chests, piles and placed crates count; without them only trading posts, packing stations and places that use the item do.</param>
-    private Thing? Deposit(string item, Vector2 origin, int exclude, bool askersOnly, bool storesTake) {
+    private Thing? Deposit(string item, Vector2 origin, int exclude, bool askersOnly, bool storesTake, Item? unit) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
         foreach (var kind in Depots) {
             if (!storesTake && Array.IndexOf(Stores, kind) >= 0) continue;
             foreach (var t in S.Things.Of(kind)) {
                 if (t.Id == exclude) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
-                int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
-                if (askersOnly && rank > 0 || Intake(t, item, false) == null) continue;
+                int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item, unit) ? 0 : 1;
+                if (askersOnly && rank > 0 || Intake(t, item, false, unit) == null) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }
@@ -2248,7 +2270,7 @@ public sealed partial class World {
     private bool ManageDeliveries(Worker w, Thing sign, float dt) {
         if (sign.Output != null)
             foreach (var pair in sign.Output.Items) {
-                if (pair.Key == Inventory.Coins || DepositFor(pair.Key, sign.Pos) is not Thing dest) continue;
+                if (pair.Key == Inventory.Coins || DepositFor(pair.Key, sign.Pos, unit: sign.Output.Object(pair.Key)) is not Thing dest) continue;
                 if (!HandsFree(w, dt)) return true;
                 w.Status = Phrase("Carrying in ", Data.Name(pair.Key));
                 if (Walk(w, sign.Pos + Vector2.One, dt)) { sign.Output.TransferTo(w.Bag, pair.Key, Worker.BagStack); w.Destination = dest.Id; }
@@ -2429,8 +2451,17 @@ public sealed partial class World {
         var output = sign?.Output ?? S.Backpack;
         var goods = order.Buying ? order.Goods : new() { [Inventory.Coins] = (int)order.Value - (sign?.Wages?.Add(Inventory.Coins, (int)order.Value) ?? 0) };
         // Boxed goods come back as packed crates of one purchase each.
-        if (order.Buying && order.Crates > 0)
-            goods = order.Goods.SelectMany(p => Enumerable.Range(0, order.Crates).Select(_ => { var box = NewCrate(); box.Add(p.Key, p.Value / order.Crates); return Pack(box); })).ToDictionary(id => id, _ => 1);
+        if (order.Buying && order.Crates > 0) {
+            foreach (var (item, quantity) in order.Goods) for (int i = 0; i < order.Crates; i++) {
+                var box = NewCrate(); box.Add(item, quantity / order.Crates);
+                var crate = Pack(box);
+                if (output.Add(crate)) continue;
+                var delivery = Add(ThingKind.Grave, sign?.Pos + Vector2.One ?? Terrain.Spawn);
+                delivery.Inventory.Slots = 1;
+                delivery.Inventory.Add(crate);
+            }
+            goods = NoCost;
+        }
         if (order.Buying) foreach (string item in order.Goods.Keys) Got(item);
         foreach (var (item, quantity) in goods) {
             int overflow = quantity - output.Add(item, quantity);
@@ -2702,31 +2733,28 @@ public sealed partial class World {
     }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
     // ---------- Validation of saves and guests ----------
-    /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
-    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Item.IsKey(item) ? Item.IdOf(item) > 0 && Item.IsObject(Item.KindOf(item)) && Data.Items.ContainsKey(Item.KindOf(item)) : !Item.IsObject(item) && Data.Items.ContainsKey(item);
-    /// <summary>No packed crates, for checking what a crate holds: a crate inside a crate is not a known item.</summary>
-    private static readonly Dictionary<int, Inventory> NoCrates = new();
+    /// <summary>Whether an id names a known item, or a packed crate where <paramref name="crates"/> allows one.</summary>
+    private bool KnownItem(string item, bool crates) => IsPacked(item) ? crates && PackedId(item) > 0 : Item.IsKey(item) ? Item.IdOf(item) > 0 && Item.IsObject(Item.KindOf(item)) && Data.Items.ContainsKey(Item.KindOf(item)) : !Item.IsObject(item) && Data.Items.ContainsKey(item);
     /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
-    private bool ValidCounts(IReadOnlyDictionary<string, int> items, Dictionary<int, Inventory> crates) {
+    private bool ValidCounts(IReadOnlyDictionary<string, int> items, bool crates) {
         foreach (var (item, count) in items) if (count <= 0 || !KnownItem(item, crates)) return false;
         return true;
     }
     /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
-    private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates, bool canGrow = false) =>
+    private bool ValidInventory([NotNullWhen(true)] Inventory? box, bool crates, bool canGrow = false) =>
         box?.Items != null && (!box.UnlimitedSlots || canGrow && box.Capacity == 0 && box.CarriedBy == Inventory.Carrier.None)
         && ValidCounts(box.Items, crates) && box.ValidUnits(ValidObject);
-    /// <summary>Whether an object in a box is whole: a lantern whose jar holds only firebugs.</summary>
-    private static bool ValidObject(Item unit) => unit.Kind == Lanterns.Item && Lanterns.Valid(unit);
-    /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
-    private bool ValidCrates(Dictionary<int, Inventory> crates) {
-        foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity || Barrel.In(box) != null) return false;
-        return true;
-    }
+    /// <summary>Whether an object in a box is whole: a lantern whose jar holds only firebugs, or a crate holding goods, no crate or barrel, and no more than it fits.</summary>
+    private bool ValidObject(Item unit) => unit.Kind switch {
+        Lanterns.Item => Lanterns.Valid(unit),
+        Crate => unit.Id > 0 && unit.Contents is { Count: > 0 } goods && ValidInventory(goods, false) && goods.Count <= Data.CrateCapacity && Barrel.In(goods) == null,
+        _ => false
+    };
     /// <summary>
     /// Whether a player from a save or a joining guest carries only known items and has needs, torch and respawn timer within their limits.
     /// The crafting queue must hold only recipes made by hand.
     /// </summary>
-    private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
+    private bool ValidPlayer(PlayerState p, bool crates) {
         if (p.HotbarSlots == null || p.Crafting == null || p.Making == null || !ValidInventory(p.Backpack, crates) || !p.Backpack.ValidFor(Inventory.Carrier.Player)) return false;
         foreach (var q in p.Crafting) if (q == null || !Hand(q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
         if (p.Making != "" && !Hand(p.Making)) return false;
@@ -2744,7 +2772,7 @@ public sealed partial class World {
         foreach (var t in save.Things) {
             if (t?.Inventory == null || !StrawBed.Valid(t, save.Time)) return false;
             foreach (var box in Boxes(t))
-                if (box != null && !ValidInventory(box, save.Crates, t.Kind == ThingKind.Chest && box == t.Inventory)) return false;
+                if (box != null && !ValidInventory(box, true, t.Kind == ThingKind.Chest && box == t.Inventory)) return false;
             if (t.Kind == ThingKind.Barrel && (t.Inventory.Slots != 1 || t.Inventory.StackSize != Barrel.Capacity
                 || t.Inventory.Capacity != Barrel.Capacity || t.Inventory.Count != t.Inventory[Water.Liquid] && t.Inventory.Count != t.Inventory[BerryJam.Liquid]
                 || t.Inventory.Count > Barrel.Capacity)) return false;
@@ -2767,12 +2795,12 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w == null || w.DrainingLiquid is string liquid && Data.VesselFor(liquid) == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelHaul.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
-        foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
+            if (w == null || w.DrainingLiquid is string liquid && Data.VesselFor(liquid) == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelHaul.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, true) || !ValidInventory(w.Bag, true) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
+        foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, true)) return false;
         return true;
     }
     /// <summary>Whether a worker's tool slot from a save is one slot holding nothing or one tool.</summary>
-    private bool ValidToolSlot(Inventory? slot, Dictionary<int, Inventory> crates) =>
+    private bool ValidToolSlot(Inventory? slot, bool crates) =>
         ValidInventory(slot, crates) && slot.Slots == 1 && slot.Count <= 1 && (slot.First() is not string item || FitsWorkerToolSlot(item));
 
     /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>
@@ -2787,12 +2815,14 @@ public sealed partial class World {
     /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>
     private static void RebuildAllStacks(SaveState save) {
         foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
-        RebuildAll(save.Crates?.Values);
         foreach (var worker in save.Workers) { worker?.Bag?.RebuildStacks(); worker?.ToolSlot?.RebuildStacks(); }
         foreach (var thing in save.Things) RebuildThing(thing);
         foreach (var thing in save.Remembered?.Values ?? Enumerable.Empty<Thing>()) RebuildThing(thing);
-        static void RebuildAll(IEnumerable<Inventory>? boxes) { if (boxes != null) foreach (var box in boxes) box.RebuildStacks(); }
-        static void RebuildThing(Thing? thing) { if (thing != null) foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
+        static void RebuildThing(Thing? thing) {
+            if (thing == null) return;
+            foreach (var box in Boxes(thing)) box?.RebuildStacks();
+            thing.Lantern?.Contents?.RebuildStacks();
+        }
     }
 
     /// <summary>
@@ -2803,7 +2833,7 @@ public sealed partial class World {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
         if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
-            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || !Beach.Valid(loaded.StrippedSand) || !SteelPipes.ValidLayout(loaded.SteelPipes) || !this.SteelPipes.ValidContents(loaded.PipeWater, loaded.PipeJam, loaded.SteelPipes) || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || !Beach.Valid(loaded.StrippedSand) || !SteelPipes.ValidLayout(loaded.SteelPipes) || !this.SteelPipes.ValidContents(loaded.PipeWater, loaded.PipeJam, loaded.SteelPipes) || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.
@@ -2812,7 +2842,7 @@ public sealed partial class World {
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || !TreePlanting.ValidStage(t) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel or ThingKind.Lantern) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
-        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates) || !Diary.Valid(p, loaded)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, true) || !Diary.Valid(p, loaded)) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;

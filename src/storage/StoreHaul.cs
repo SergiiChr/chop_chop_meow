@@ -15,7 +15,7 @@ internal sealed class StoreHaul : PlaceHaul {
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
             if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to) continue;
-            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Hauling.Takes(world, to, item, free), Rule = 1 });
+            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Hauling.Takes(world, to, item, free, t.Inventory.Object(item)), Rule = 1 });
         }
         if (FillSource(t, w.Pos) is (string wanted, Thing from, int count)) Offer(ref best, new Carry { Place = t, From = from, To = t, Item = wanted, Count = count, Rule = 1 });
     }

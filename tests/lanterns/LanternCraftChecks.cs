@@ -41,7 +41,7 @@ internal static class LanternCraftChecks {
         Work(world, 20, () => packer.Output!.First() is string crate && world.Packed(crate)?.Count == 2);
         string packed = packer.Output!.First() ?? "";
         var box = world.Packed(packed);
-        Require(box != null && box[first] == 1 && box[second] == 1 && World.PackedKind(packed).SequenceEqual("crate_lantern"),
+        Require(box != null && box[first] == 1 && box[second] == 1 && world.FilterEntryOf(packed) == World.CrateOf(Lanterns.Item),
             "two empty lanterns should pack as one kind of good without losing their individual items");
     }
 }

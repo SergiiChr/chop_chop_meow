@@ -88,7 +88,7 @@ public partial class PagePanel {
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(held, item) : -1, world.Packed(item)?.Count ?? 0)
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(held, item) : -1, World.IsPacked(item) ? held.Object(item)?.Contents?.Count ?? 0 : 0)
                     : ((string?)null, 0, 0, false, -1, -1, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
@@ -104,7 +104,7 @@ public partial class PagePanel {
         return grid;
         void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life, int bugs) {
             cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
-            var contents = stack is (string crate, _) ? world.Packed(crate) : null;
+            var contents = stack is (string crate, _) && World.IsPacked(crate) ? held.Object(crate)?.Contents : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);

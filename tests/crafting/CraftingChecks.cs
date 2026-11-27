@@ -895,7 +895,7 @@ public static class CraftingChecks {
         world.Player = packer.Pos + new Vector2(1, 0);
         SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
         string crate = packer.Output.First()!;
-        Require(crate.StartsWith(World.CrateOf("bread") + "_"), $"the player working it should name the crate after its good: {crate}");
+        Require(world.FilterEntryOf(crate) == World.CrateOf("bread"), $"the player working it should pack a crate of its good: {crate}");
         Require(world.Packed(crate)!["bread"] == data.CrateCapacity, $"the player working it should pack a crate of twelve bread: {crate}");
         Require(packer.Inventory["bread"] == 1, $"the packing station should use up one bread: {crate}");
         Require(packer.Inventory["crate"] == 1, $"the packing station should use up one empty crate: {crate}");

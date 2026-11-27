@@ -102,7 +102,7 @@ internal static class PlayerSteps {
         Require(box != null, "an empty crate should be placed from the backpack");
         Require(world.Transfer(world.Backpack, box!.Inventory, item, count) == count, $"{count} {item} should move from the backpack into the crate");
         Require(world.PickUpCrate(box), "the packed crate should be picked up");
-        string packed = world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix));
+        string packed = world.Backpack.Items.Keys.First(World.IsPacked);
         Require(world.Packed(packed)?[item] == count && world.Transfer(world.Backpack, sign.Inventory, packed, 1) == 1, $"the crate of {item} should go on the cart");
     }
 

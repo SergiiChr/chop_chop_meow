@@ -14,6 +14,8 @@ public sealed class Item {
     internal static readonly IComparer<Item> Soonest = Comparer<Item>.Create((a, b) => a.Expires.CompareTo(b.Expires));
     /// <summary>The kinds whose every unit is an object found by its key, such as a lantern.</summary>
     internal static readonly string[] Keyed = [Lanterns.Item];
+    /// <summary>The kinds that are objects only while they hold something, such as a packed crate, and plain units of their kind once empty.</summary>
+    internal static readonly string[] Holders = [World.Crate];
     private const char KeyMark = '#';
 
     public string Kind { get; set; } = "";
@@ -44,6 +46,20 @@ public sealed class Item {
     internal static string KindOf(string item) {
         if (!IsKey(item)) return item;
         foreach (string kind in Keyed) if (IsKind(item, kind)) return kind;
+        foreach (string kind in Holders) if (IsKind(item, kind)) return kind;
         return item[..item.IndexOf(KeyMark)];
+    }
+    /// <summary>Whether this object turns back into a plain unit of its kind now that it holds nothing.</summary>
+    internal bool Emptied => Contents is { Count: 0 } && Array.IndexOf(Holders, Kind) >= 0;
+    /// <summary>The one kind of item this object holds, the empty string when it holds several, or null when it holds nothing.</summary>
+    internal string? SoleKind() {
+        if (Contents is not { Count: > 0 } contents) return null;
+        string? sole = null;
+        foreach (var pair in contents.Items) {
+            string kind = KindOf(pair.Key);
+            if (sole != null && sole != kind) return "";
+            sole = kind;
+        }
+        return sole;
     }
 }

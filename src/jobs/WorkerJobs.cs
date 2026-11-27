@@ -97,11 +97,12 @@ public sealed partial class World {
         var dest = Find(w.Destination);
         if (FillsLeftover(w, dest, item, dt)) return true;
         // Rules are read again every tick, so a filter changed or a slot filled while a load is on its way sends it elsewhere.
-        var intake = dest == null ? null : Intake(dest, item, w.Fueling);
+        var unit = w.Bag.Object(item);
+        var intake = dest == null ? null : Intake(dest, item, w.Fueling, unit);
         // A load with nowhere to go looks for a place again only a few times a second, as a worker with nothing to do reads their list.
         if (intake == null && S.Time >= w.LookAgain) {
-            dest = DepositFor(item, w.Pos); w.Fueling = false;
-            intake = dest == null ? null : Intake(dest, item, false);
+            dest = DepositFor(item, w.Pos, unit: unit); w.Fueling = false;
+            intake = dest == null ? null : Intake(dest, item, false, unit);
             if (intake == null) { dest = takeBack.Nearest(item, w.Pos); w.LookAgain = S.Time + JobListSeconds; }
         }
         if (dest == null || intake is not (Inventory into, int room)) return takeBack.Bring(w, dest, item, dt);
@@ -129,7 +130,8 @@ public sealed partial class World {
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>
     /// <param name="fueling">The load was fetched for the fuel slot, so it goes there even when the recipe also takes the item as an input.</param>
-    internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling) {
+    /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate, whose goods the filters judge.</param>
+    internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling, Item? unit = null) {
         int room;
         if (IsStation(dest.Kind)) {
             if (!fueling && (room = InputRoom(dest, item)) > 0) return (dest.Inventory, room);
@@ -141,11 +143,11 @@ public sealed partial class World {
             ThingKind.Barrel when PoursInto(dest, dest.Inventory, item) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
                 => dest.Inventory.Room(vessel.Liquid),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
-            ThingKind.Signpost when !dest.Inventory.Accepts(item) => 0,
-            ThingKind.Packer => dest.Inventory.Accepts(item) && Holds(dest, item) ? PackingRoom(dest, item) : 0,
+            ThingKind.Signpost when !dest.Inventory.Accepts(item, unit) => 0,
+            ThingKind.Packer => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? PackingRoom(dest, item) : 0,
             _ when dest.Compost && dest.SkipFood && Data.IsFood(item) => 0,
             _ when Nests(dest, item) => 0,
-            _ => dest.Inventory.Accepts(item) && Holds(dest, item) ? dest.Inventory.Room(item) : 0
+            _ => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? dest.Inventory.Room(item) : 0
         };
         return room > 0 ? (dest.Inventory, room) : null;
     }

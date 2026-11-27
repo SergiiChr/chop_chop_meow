@@ -90,7 +90,7 @@ public static class HeldStackChecks {
         Give(world, "crate", 1); Give(world, "wood", 10);
         world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 5);
         world.FromHeldStack(() => world.MoveInCrate(0, "wood", int.MaxValue, true));
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = world.Backpack.Items.Keys.Single(World.IsPacked);
         Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
             "five held wood put on an empty crate should pack just those five");
     }

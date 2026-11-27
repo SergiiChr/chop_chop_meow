@@ -16,7 +16,6 @@ public sealed class Firebugs(World world) {
     public const string Item = "firebug";
     internal float NewExpiry => world.Time + world.Data.Items[Item].LifeDays * world.Data.DaySeconds;
     private float nextExpiry = float.PositiveInfinity;
-    private readonly List<(int Id, string Name)> changedCrates = new();
     private readonly List<ChopChopMeow.Item> catchBuffer = new();
 
     /// <summary>Starts the three-day lifetime of each firebug this inventory can take from a catch.</summary>
@@ -43,18 +42,12 @@ public sealed class Firebugs(World world) {
 
     internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
 
-    /// <summary>Clears dead bugs from the inventories that can hold them, and from the lanterns in them, when the next catch expires.</summary>
+    /// <summary>Clears dead bugs from the inventories that can hold them, and from the lanterns and crates in them, when the next catch expires.</summary>
     internal void Age() {
         float now = world.Time;
         if (now < nextExpiry) return;
         nextExpiry = float.PositiveInfinity;
-        changedCrates.Clear();
         var saved = world.S;
-        foreach (var (id, box) in saved.Crates) {
-            int before = box[Item];
-            Check(box);
-            if (box[Item] != before) changedCrates.Add((id, World.PackedName(box, id)));
-        }
         foreach (var player in saved.Players) Check(player.Backpack);
         foreach (var player in saved.Absent.Values) Check(player.Backpack);
         foreach (var worker in saved.Workers) Check(worker.Bag);
@@ -63,12 +56,8 @@ public sealed class Firebugs(World world) {
             if (thing.Output is { } output) Check(output);
             if (thing.Lantern?.Contents is { } jar) Check(jar);
         }
-        foreach (var (id, name) in changedCrates) if (name == "crate") saved.Crates.Remove(id);
 
-        void Check(Inventory box) {
-            nextExpiry = Math.Min(nextExpiry, box.Expire(now));
-            foreach (var (id, name) in changedCrates) box.RenamePackedCrate(id, name);
-        }
+        void Check(Inventory box) => nextExpiry = Math.Min(nextExpiry, box.Expire(now));
     }
     /// <summary>Metres a firebug keeps from every building as it comes out.</summary>
     public const float BuildingRoom = 25;

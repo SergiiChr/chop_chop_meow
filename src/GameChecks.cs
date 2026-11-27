@@ -148,7 +148,7 @@ public partial class Game {
         var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         Give(Hosted, "wood", 5); Give(Hosted, Inventory.Coins, 100);
         var berries = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); Hosted.PickUpCrate(berries);
-        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = Hosted.Backpack.Items.Keys.Single(World.IsPacked);
         await Click(view.Screen(sign.Pos, .8f));
         Require(Shows(sign), "Clicking a trading post must select it.");
         Require(Named("sell") != null, "The market must offer a sell button.");
@@ -483,7 +483,7 @@ public partial class Game {
     private async Task CheckCratePutIntoCrateStopsAtWarning() {
         var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
-        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = Hosted.Backpack.Items.Keys.Single(World.IsPacked);
         // A crate selected on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
         string lastSlot = world.HotbarItem(8); int active = world.ActiveHotbar;
         Give(Hosted, "crate", 1); SetHotbarSlot(Hosted, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
@@ -797,7 +797,7 @@ public partial class Game {
         await Holding(Key.Shift, async () => await Click(await Showing(1, c => c.TooltipText.StartsWith("Berries"))));
         await Until(() => world.Backpack["berries"] == berries, "Shift on the berries in the backpack packing that stack back into the open crate", 2);
         await CloseWithEsc();
-        Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); Give(Hosted, "berries", carried); await Frames();
+        Drop(Hosted, world.Backpack.Items.Keys.First(World.IsPacked)); Give(Hosted, "berries", carried); await Frames();
     }
     /// <summary>The driver behind `--drive` plays its command file as real input and reports each line once: a key it sends opens the backpack, and a command it does not know fails by name.</summary>
     private async Task CheckDriverPlaysItsCommandFileAsRealInput() {
@@ -900,13 +900,13 @@ public partial class Game {
         await DoubleClick(await Showing(0, c => c.TooltipText.StartsWith("Wood crate ·")));
         await Until(() => panel.Page == Page.Crate && Cells(0).Any(), "a double click on an empty crate opening it as storage", 2);
         await Carry(BagCell(c => c.TooltipText.StartsWith("Stone")), Cell(0, c => c.TooltipText == ""));
-        await Until(() => world.Backpack.Items.Keys.Any(id => id.StartsWith(World.PackedPrefix)) && Cells(0).Any(c => c.TooltipText.StartsWith("Stone")),
+        await Until(() => world.Backpack.Items.Keys.Any(World.IsPacked) && Cells(0).Any(c => c.TooltipText.StartsWith("Stone")),
             "the stone packing the empty crate, whose page shows it", 2);
         Require(world.Backpack["crate"] == 0 && world.Backpack["stone"] == 0, "Packing the empty crate must use it and all three stone.");
         await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood crate of")));
         await Until(() => panel.Page == Page.Backpack, "picking up the open crate closing its page for the backpack's", 2);
         await KeyStroke(Key.Escape); await CloseWithEsc();
-        Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
+        Drop(Hosted, world.Backpack.Items.Keys.First(World.IsPacked)); await Frames();
     }
     /// <summary>At a trading post a click on the bank picks up all its coins, and coins put on it pay in.</summary>
     private async Task CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown() {

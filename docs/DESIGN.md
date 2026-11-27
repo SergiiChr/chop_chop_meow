@@ -1604,11 +1604,11 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 #### Crates
 
 A wood crate holds `CrateCapacity` (12) units.
-A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
-Those contents have an update entry of their own (`EntryKey.Crates`), sent only when a packed crate changes.
-`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
-A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
-`World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
+A picked-up crate becomes an `Item` object found by its key, such as `crate#17`, whose `Contents` hold its goods; an empty one is the stackable item `crate`.
+The object travels inside the box that holds it, in a save or an update alike.
+`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack; emptied, it becomes a plain `crate` in the same cell (`Inventory.Unpack`), as it does when the firebugs packed in it all die.
+Filters name the kind of crate by its good (`World.CrateOf`), worked out from the crate's goods (`World.PackedGood`): routing hands the crate object to `Inventory.Accepts` and `Inventory.Wants` along with its key.
+A crate of mixed goods stands under `World.MixedCrate`, which only a pile's filter can name.
 A pile of crates holds crates of one good, or crates of mixed goods.
 A placed crate takes part in automation like a chest, and its filters stay with its contents while it is packed.
 No worker carries a crate into one, and its filters name none (`World.Nests`).

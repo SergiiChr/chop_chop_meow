@@ -116,7 +116,7 @@ Allocation budgets:
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
 - The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
-- A list that grows with play gets an update entry of its own, as gravel path tiles (`EntryKey.Paths`) and packed crates (`EntryKey.Crates`) have, and stays out of the world's state entry, which is written again on every update because time moves.
+- A list that grows with play gets an update entry of its own, as gravel path tiles (`EntryKey.Paths`) have, and stays out of the world's state entry, which is written again on every update because time moves.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the lake to the valley's top corner, by day and at night with a lit torch, split by leg.

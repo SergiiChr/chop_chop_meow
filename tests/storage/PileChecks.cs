@@ -158,11 +158,11 @@ public static class PileChecks {
         var world = EmptyWorld(data);
         string crate = PackCrate(world, ("bread", data.CrateCapacity));
         var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
-        pile.Inventory.Add(crate, 1); Drop(world, crate, 1);
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, crate, 1);
         world.Tick(.01f);
         string otherBread = PackCrate(world, ("bread", 2)), berryCrate = PackCrate(world, ("berries", 2));
         Require(world.Holds(pile, otherBread), "a pile of bread crates should hold another bread crate");
-        Require(pile.Inventory.Accepts(otherBread),
+        Require(world.Accepts(pile, otherBread),
             "a pile of bread crates should accept another bread crate into its inventory");
         Require(!world.Holds(pile, berryCrate), "a pile of bread crates should not hold a crate of berries");
         Require(!world.Holds(pile, PackCrate(world, ("bread", 1), ("berries", 1))), "a pile of bread crates should not hold a crate of mixed goods");
@@ -173,14 +173,15 @@ public static class PileChecks {
         var world = EmptyWorld(data);
         string first = PackCrate(world, ("bread", 2), ("berries", 2));
         var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
-        pile.Inventory.Add(first, 1); Drop(world, first, 1);
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, first, 1);
         world.Tick(.01f);
         Require(world.PileFilter(pile) == World.MixedCrate && world.FilterName(World.MixedCrate) == "Mixed crate", "a crate of mixed goods should set a pile to mixed crates");
         pile.Inventory.Remove(first, 1);
         world.Tick(.01f);
         string other = PackCrate(world, ("wood", 1), ("stone", 1));
-        Require(world.Holds(pile, other) && pile.Inventory.Accepts(other) && pile.Inventory.AllowsWithdrawal(other),
-            "an emptied pile of mixed crates should still take and give any other crate of mixed goods");
+        Require(world.Holds(pile, other) && world.Accepts(pile, other), "an emptied pile of mixed crates should still take any other crate of mixed goods");
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, other, 1);
+        Require(pile.Inventory.AllowsWithdrawal(other), "a pile of mixed crates should give out any crate of mixed goods it took");
         Require(!world.Holds(pile, PackCrate(world, ("bread", 2))), "a pile of mixed crates should not hold a crate of one good");
     }
 }

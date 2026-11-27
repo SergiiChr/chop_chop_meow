@@ -5,7 +5,7 @@ internal sealed class PackerHaul : PlaceHaul {
     public PackerHaul(World world) : base(world) { }
 
     public override void Carries(Worker w, Thing t, ref Carry best) {
-        if (t.Output!.First() is string crate && !world.OpenCrate(t, crate) && t.Output.Free(crate) > 0 && world.DepositFor(crate, t.Pos, t.Id) is Thing shelf)
+        if (t.Output!.First() is string crate && !World.OpenCrate(t, crate) && t.Output.Free(crate) > 0 && world.DepositFor(crate, t.Pos, t.Id, t.Output.Object(crate)) is Thing shelf)
             Offer(ref best, TakeOut(t, shelf, CarryBox.Output, crate, 1, true));
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
