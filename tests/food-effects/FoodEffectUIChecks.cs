@@ -8,6 +8,8 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunFoodEffectUIChecks() {
         await TestClean(JamShowsAtMostOneFullHungerBar);
+        await TestClean(CookingOutputShowsWhatTheFoodRestores);
+        await TestClean(AJamBarrelShowsWhatItsJamRestores);
         await TestClean(EatingStewShowsItsEffectsBelowTheNeedsPlate);
     }
 
@@ -33,6 +35,31 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Drop(Hosted, BerryJam.Bottle, 1);
         Drop(Hosted, "canned_jam", 1);
+        await CloseWithEsc();
+    }
+
+    private async Task CookingOutputShowsWhatTheFoodRestores() {
+        var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
+        Hosted.SetRecipe(table, "meat_stew");
+        await ClickOn(table);
+        var output = OnPage("output_meat_stew")!;
+        Require(output.TooltipText.Contains("LMB:") && !output.TooltipText.Contains("Effects:"), "an empty output should still explain how to use the slot");
+        table.Inventory.Add("meat_stew", 1);
+        await Until(() => output.TooltipText.StartsWith("Meat stew · 1/"), "the cooked stew in the output");
+        Require(output.TooltipText.Contains("Hunger: fills to 150%\nEffects:") && !output.TooltipText.Contains("LMB:"),
+            "a finished stew should show hunger and effects without the controls line");
+        RemoveThings(Hosted, t => t == table);
+        await CloseWithEsc();
+    }
+
+    private async Task AJamBarrelShowsWhatItsJamRestores() {
+        var barrel = Hosted.Add(ThingKind.Barrel, Hosted.Player + new Vector2(1.2f, 0));
+        barrel.Inventory.Add(BerryJam.Liquid, 2);
+        await ClickOn(barrel);
+        var contents = OnPage("barrel_water")!;
+        Require(contents.TooltipText.StartsWith("Berry jam · 2/") && contents.TooltipText.Contains("Hunger: +100% per liter\nEffects:")
+            && !contents.TooltipText.Contains("LMB:"), "jam in a barrel should show what one liter does without the controls line");
+        RemoveThings(Hosted, t => t == barrel);
         await CloseWithEsc();
     }
 

@@ -18,6 +18,7 @@ public static class DoorCheckChecks {
         Test(CheckAWolfScratchesAtALockedDoorAndGoesAway, data);
         Test(CheckAWolfComesBackToALockedCabinOnlyAfterLeavingItsSmell, data);
         Test(CheckAWolfForcesAnUnlockedDoorAndTugsThePlayerOut, data);
+        Test(ACabinWolfBiteSpendsBonusHealthBeforeNormalHealth, data);
         Test(CheckTheKeyTurnsWhileAWolfScratchesButNotOnceItPries, data);
         Test(CheckNobodyStepsOutWhileAWolfIsAtTheDoor, data);
         Test(CheckAWolfTakesOutTheLastPlayerWhoCameIn, data);
@@ -92,6 +93,19 @@ public static class DoorCheckChecks {
         Require(world.Player.DistanceTo(Doorways.DoorPoint(hut) + new Vector2(0, 1)) < .01f, $"a wolf should tug a player a metre out from the door, not to {world.Player - Doorways.DoorPoint(hut)}");
         DoorCheckTick(world, .5f);
         Require(world.Sheltered == 0 && wolf.DoorCheck == DoorCheckStage.None && wolf.Target == world.Me.Id, $"the wolf should go on hunting the player it let go, who stays outside, not {wolf.DoorCheck}");
+    }
+
+    private static void ACabinWolfBiteSpendsBonusHealthBeforeNormalHealth(GameData data) {
+        var (world, hut, _) = ShelteredNight(data, locked: false);
+        SetNeeds(world, health: 1);
+        Give(world, "canned_jam"); world.Consume("canned_jam");
+        ScratchingWolf(world, hut);
+        DoorCheckTick(world, 10.5f);
+        Require(world.Door == Doorway.Tugged && world.Health == 46 && world.BonusHealth == 35,
+            "a cabin wolf's bite should leave 11 normal HP and 35 bonus HP");
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.Health == 46 && loaded.BonusHealth == 35, "a save immediately after the bite should preserve both parts of health");
     }
 
     private static void CheckTheKeyTurnsWhileAWolfScratchesButNotOnceItPries(GameData data) {

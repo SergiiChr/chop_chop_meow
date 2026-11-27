@@ -832,7 +832,7 @@ Raw meat sells as it is, in crates.
 A berry restores 5% hunger and crushed berries restore 55%. A liter of bottled jam or a can of jam fills hunger to 100%.
 Hunger stops at 100% unless meat stew fills it past that point.
 
-Cooked foods show how much hunger they restore and list their **Effects** in their descriptions:
+Cooked food descriptions in item slots and the Recipe map show how much hunger they restore and list their **Effects**:
 
 | Food | Effects |
 | --- | --- |
