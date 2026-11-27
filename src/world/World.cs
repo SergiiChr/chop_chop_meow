@@ -1692,9 +1692,7 @@ public sealed partial class World {
         return good == null ? "crate" : $"{PackedPrefix}{good}_{id}";
     }
     /// <summary>An item's name, with what a packed crate holds.</summary>
-    public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? LanternName(Lanterns.BugCount(item)) : Data.Name(item);
-    /// <summary>A lantern's name, which says when it holds no living firebugs.</summary>
-    internal string LanternName(int bugs) => bugs == 0 ? Lanterns.EmptyName : Data.Name(Lanterns.Item);
+    public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(item)) : Data.Name(item);
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
         foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;

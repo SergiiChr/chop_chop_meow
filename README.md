@@ -1313,19 +1313,26 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 
 ### Lantern
 
-Finally a sustainable source of light. The crafting bench makes an empty lantern.
+Finally a sustainable source of light.
+The crafting bench makes an empty lantern.
 Right-click a lantern in the backpack, on the hotbar or on the ground to open it.
 Put firebugs onto its slot to add as many as fit, or right-click the slot while holding a stack to add one.
-It takes up to ten, shortest lives first. Putting a firebug in a lantern does not reset its life.
-The jar glows from inside. Its light dims as firebugs die, and you can add more at any time as long as there is room.
-A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not scare wolves.
+It takes up to ten, shortest lives first.
+Putting a firebug in a lantern does not reset its life.
+The jar glows from inside.
+Its light dims as firebugs die, and you can add more at any time as long as there is room.
+A full lantern is 20% brighter than a torch, with a green hue.
+Lanterns do not scare wolves.
 A green badge at the upper right of a lantern's icon shows how many live firebugs are inside.
 Where a station shows several lanterns in one slot, the green number is for the lantern you can take next.
 
-Double-click a lantern to take it in hand and put out any lit torch. Double-click it again to stow it.
-You can still select tools. While your hands are needed for work, the lantern hangs from your belt and keeps shining.
-Hotbar lanterns light the way even when they are not selected. Slots 1–6 hang from your belt, slot 7 from your backpack,
-and slots 8 and 9 from your shoulders. Held and worn lanterns are the same size and swing more as you run.
+Double-click a lantern to take it in hand and put out any lit torch.
+Double-click it again to stow it.
+You can still select tools.
+While your hands are needed for work, the lantern hangs from your belt and keeps shining.
+Hotbar lanterns light the way even when they are not selected.
+Slots 1–6 hang from your belt, slot 7 from your backpack, and slots 8 and 9 from your shoulders.
+Held and worn lanterns are the same size and swing more as you run.
 A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
 Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.
 

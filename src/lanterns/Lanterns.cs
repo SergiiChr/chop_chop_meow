@@ -53,6 +53,8 @@ public sealed class Lanterns(World world) {
 
     internal static bool Valid(Thing t) => t.Kind == ThingKind.Lantern ? ValidItem(t.LanternItem) : t.LanternItem == null;
     public int BugCount(string? item) => Living(item, default);
+    /// <summary>A lantern's name, which says when it holds no living firebugs.</summary>
+    internal string Name(int bugs) => bugs == 0 ? EmptyName : world.Data.Name(Item);
 
     /// <summary>The stack of living firebugs in this lantern, with their average game minutes left.</summary>
     internal (int Count, int AverageMinutes) FirebugStack(string? item) {

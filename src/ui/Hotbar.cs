@@ -83,7 +83,7 @@ public partial class Hotbar : PanelContainer {
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
         button.Controls = new SlotInput(cursor) {
-            Takes = held => held.Item is string id && (world.Data.IsItem(id) || world.Data.IsBuilding(id)),
+            Takes = held => held.Item is string id && (world.Data.HasItem(id) || world.Data.IsBuilding(id)),
             // A held stack binds itself to the slot (World.BindHeld); a plan is only named there.
             Put = (held, _) => {
                 if (held.Stack is HeldStack stack) world.FromHeldStack(() => world.SetHotbar(slot, stack.Item));
@@ -172,7 +172,7 @@ public partial class Hotbar : PanelContainer {
     /// <summary>The item selected: the tool in hand, or else the item on the selected hotbar slot; null for none.</summary>
     public string? ActiveItem() {
         string id = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
-        return world.Data.IsItem(id) ? id : null;
+        return world.Data.HasItem(id) ? id : null;
     }
 
     /// <summary>The backpack cell the item selected is used from: the stack bound to the selected hotbar slot, or -1 for the tool in hand or a slot bound to none.</summary>

@@ -25,7 +25,7 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         hint.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         fill.AddChild(hint);
         live.Watch(() => world.Lanterns.FirebugStack(Item), bugs => {
-            headingTitle.Text = world.LanternName(bugs.Count);
+            headingTitle.Text = world.Lanterns.Name(bugs.Count);
             count.Text = $"{bugs.Count}/{Lanterns.Capacity}";
             cell.AddThemeColorOverride(ItemSlot.IconNormal, bugs.Count > 0 ? Colors.White : Style.Ghost);
             string deposit = bugs.Count == Lanterns.Capacity ? "The lantern is full."

@@ -438,7 +438,7 @@ public sealed partial class GameData {
     /// <summary>An item or, for a lantern with a charge of its own, the shared recipe item.</summary>
     private ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Lanterns.Kind(item));
     /// <summary>Whether an id names an item, a lantern of any charge included.</summary>
-    public bool IsItem(string id) => ItemDefinition(id) != null;
+    public bool HasItem(string id) => ItemDefinition(id) != null;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0, ThingKind? station = null) =>
         (station is ThingKind at ? FixedTool(at, kind) : null) ?? Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;

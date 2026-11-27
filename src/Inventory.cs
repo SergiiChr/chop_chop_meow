@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 
 namespace ChopChopMeow;
@@ -117,7 +118,7 @@ public sealed class Inventory {
     /// <summary>
     /// Most coins per cell: 1000, or <see cref="UnlimitedCoins"/> in a trading post's wage slot.
     /// </summary>
-    [JsonPropertyOrder(-1), JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
@@ -293,7 +294,7 @@ public sealed class Inventory {
             int n = Math.Min(StackOf(item), left);
             Layout[empty].Item = item; Layout[empty].Count = n;
             if (item == Firebugs.Item && overflowFirebugs != null && nextOverflow + n <= overflowFirebugs.Count) {
-                AddFirebugExpiries(Layout[empty], System.Runtime.InteropServices.CollectionsMarshal.AsSpan(overflowFirebugs).Slice(nextOverflow, n));
+                AddFirebugExpiries(Layout[empty], CollectionsMarshal.AsSpan(overflowFirebugs).Slice(nextOverflow, n));
                 nextOverflow += n;
             }
             left -= n;
@@ -432,10 +433,9 @@ public sealed class Inventory {
     public bool AllowsWithdrawal(string item) => Passes(OutputFilter, item);
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     public bool Wants(string item) => Names(InputFilter, item);
-    /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     /// <summary>Whether a stack takes more of an item: a stack of it, unless it is firebugs a player holds part of, whose lives must stay in order behind the held ones.</summary>
     private static bool TopsUp(Slot slot, string item) => slot.Item == item && (item != Firebugs.Item || slot.Held == 0);
-
+    /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
     private bool Passes(FilterList filter, string item) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item);
     /// <summary>A filter names an item itself, a lantern of any charge, or a packed crate of its named good.</summary>
@@ -623,7 +623,7 @@ public sealed class Inventory {
 
     internal float AverageFirebugExpiry(int slot) {
         return (uint)slot < (uint)Layout.Count && Layout[slot].FirebugExpiries is { } dates
-            ? Firebugs.Average(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(dates)) : 0;
+            ? Firebugs.Average(CollectionsMarshal.AsSpan(dates)) : 0;
     }
 
     /// <summary>The average expiry over all the firebug stacks in the box, such as a station's one input.</summary>
@@ -686,7 +686,7 @@ public sealed class Inventory {
     /// <summary>Moves the oldest units from an unheld stack when two cells merge.</summary>
     private static void MoveFirebugExpiries(Slot from, Slot to, int count) {
         if (from.FirebugExpiries is not { } dates) return;
-        AddFirebugExpiries(to, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(dates)[..count]);
+        AddFirebugExpiries(to, CollectionsMarshal.AsSpan(dates)[..count]);
         dates.RemoveRange(0, count);
     }
 

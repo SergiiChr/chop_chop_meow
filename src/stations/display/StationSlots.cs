@@ -142,7 +142,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
             count.SetStack(now.Count, -1);
             firebugs.SetStack(0, now.Bugs);
-            string name = world.LanternName(now.Bugs);
+            string name = world.Lanterns.Name(now.Bugs);
             cell.TooltipText = $"{name} · {now.Count}{world.Data.DescriptionLine(Lanterns.Item)}\n{SlotHint}";
         });
         return Labelled(cell, perBatch);
