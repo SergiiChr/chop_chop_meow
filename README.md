@@ -837,7 +837,7 @@ Cooked food descriptions in item slots and the Recipe map show how much hunger t
 | Food | Effects |
 | --- | --- |
 | Bread | **Carb load** makes Shift sprinting 25% faster for 4 in-game hours. |
-| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. It does not heal twice as fast during sleep. |
+| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. While you sleep it adds to sleep healing, so you heal twice as fast. |
 | Meat stew | **Well fed** fills hunger to 150% and lasts until it falls back to 100%. The hover countdown shows how long the extra hunger will last at your current pace. Stew also gives **Protein recovery**. |
 | Berry jam | **Vitamins** heals up to 10 normal HP and fills 50 bonus HP for one in-game day. Damage spends bonus HP first. Healing fills normal HP first, then the bonus. Only health above 100 HP is lost when Vitamins wears off. Jam also gives **Carb load**. |
 

@@ -730,7 +730,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
   Healing is prorated to the part of the tick before either need falls below the threshold.
 - The server saves and sends each player's remaining time for Carb load, Protein recovery and Vitamins in `PlayerState`.
   Well fed is the part of hunger above 100%, so its countdown follows hunger drain rather than a separate timer.
-  Protein recovery heals at the sleep rate without the sleep requirement, and does not double the rate during sleep.
+  Protein recovery heals at the sleep rate without the sleep requirement, and adds to sleep healing, so a sleeper heals twice as fast.
   The sleep forecast includes both kinds of healing and accounts for Vitamins expiring before wake-up.
   Vitamins fills `PlayerState.BonusHealth`, which is part of total health and takes damage first.
   Healing fills normal health before the bonus, and expiry only removes total health above 100%.
