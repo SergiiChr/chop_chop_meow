@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 public enum GatherShape { Patch, Deposit, Loose, Dug, Plucked, Caught }
 
 /// <summary>A gathering action shared by resources taken with the same kind of work.</summary>
-public enum GatherAction { DigUpThings, ChopTrees, MineOres, RakeLeaves, GatherNettles, CatchFirebugs }
+public enum GatherAction { DigUpThings, ChopTrees, MineOres, RakeLeaves, CatchFirebugs }
 
 /// <summary>How one kind of resource is gathered.</summary>
 /// <param name="Item">What gathering it yields.</param>
@@ -66,7 +66,7 @@ public static class GatherRules {
         [ThingKind.Stump] = new("wood", Needs: GroundHoles.Tool, Shape: GatherShape.Dug, ToolAction: GatherAction.DigUpThings),
         [ThingKind.Bush] = new("leaves", Needs: GroundHoles.Tool, Shape: GatherShape.Dug, Job: "bushes", ToolAction: GatherAction.DigUpThings),
         // A nettle takes 3 seconds to pick, whatever is carried.
-        [ThingKind.Nettle] = new("nettle", ByHand: 1.5f, Shape: GatherShape.Plucked, Sting: 1, Spares: GroundHoles.Tool, ToolAction: GatherAction.GatherNettles),
+        [ThingKind.Nettle] = new("nettle", ByHand: 1.5f, Shape: GatherShape.Plucked, Sting: 1, Spares: GroundHoles.Tool, ToolAction: GatherAction.DigUpThings),
         // A player catches a firebug with a swing of the net; a worker with a net takes the one they reach.
         [ThingKind.Firebug] = new("firebug", Needs: "net", Shape: GatherShape.Caught, ToolAction: GatherAction.CatchFirebugs),
     };

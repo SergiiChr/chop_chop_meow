@@ -728,8 +728,8 @@ An item discovered while the map is open reveals its name and icon without reope
   menu for a recipe made by hand.
 - Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
   **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
-  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes and
-  beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
+  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes,
+  nettles and beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
   The pickaxe and hammers share **Building a mine** for preparing it.
   All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
   Water shows **Drink**, **Water farm plots** and **Water saplings**. Berry jam shows **Food**.

@@ -142,8 +142,8 @@ public partial class Game {
             .Select(label => label.Text).Where(text => text.StartsWith("Dig", StringComparison.Ordinal)).Order().ToArray();
         Require(digging != null && digging.SequenceEqual(new[] { "Dig holes", "Dig up things." }),
             "A shovel must list digging for resources once and digging holes separately.");
-        Require(HasLabel(actions!, "Gather nettles without stings") && !HasLabel(actions!, "Chop trees"),
-            "The shovel must keep its distinct gathering use without taking the axe's actions.");
+        Require(!HasLabel(actions!, "Gather nettles without stings") && !HasLabel(actions!, "Chop trees"),
+            "The shovel's nettle picking must come under Dig up things., and the shovel must not take the axe's actions.");
         Require(HasLabel(actions!, "Can be sold for profit.") && !HasLabel(actions!, "Pack"),
             "A shovel can be sold for profit, but packing is not an Item tree action.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));

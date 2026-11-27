@@ -1362,7 +1362,7 @@ Alt-click on a discovered item's card, chip or detail thumbnail opens its Item t
 `ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
 product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
 cost that material and lists the item's direct actions. Packing is not listed. `GatherRules` gives the gathering
-actions one name for each kind of work. Digging up stumps, bushes and beach sand shares **Dig up things.**
+actions one name for each kind of work. Digging up stumps, bushes, nettles and beach sand shares **Dig up things.**
 Digging a hole stays a separate action because it yields nothing. Surface deposits and open mines share **Mine ores**.
 Digging an entrance and fitting a mine's frame and rails share **Building a mine**.
 `GameData.MapEntryOf` resolves every container fill to its base entry, so every fill of a bottle links to **Bottle**.
