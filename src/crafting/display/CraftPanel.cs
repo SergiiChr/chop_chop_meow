@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// <summary>The personal crafting menu: the recipe board, then what is being made by hand and what waits after it.</summary>
 public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
     protected override void Build() {
-        headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
+        headingIcon.Texture = Icons.Of("menu_crafting"); headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, null, null));
         CraftQueue();

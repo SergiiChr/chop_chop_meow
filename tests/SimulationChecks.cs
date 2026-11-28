@@ -22,6 +22,7 @@ public static class SimulationChecks {
         AnimationChecks.Run(data);
         PropMotionChecks.Run();
         HumanModelChecks.Run();
+        HardHatModelChecks.Run(data);
         NatureModelChecks.Run();
         Test(PileModelChecks.Run, data);
         Test(PileModelChecks.Goods, data);

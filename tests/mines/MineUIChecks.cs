@@ -80,6 +80,22 @@ public partial class Game {
         await Until(() => HasLabel(panel, "Stage 3 · Fit the frame and rails"), "the open mine page moving on to the fitting", 3);
         mine.MineStage = MineStage.Open;
         await Until(() => ShowsChild(panel, "output_stone") && !HasLabel(panel, "Stage 3"), "the open mine page showing the mine's outputs once it opens", 3);
+        var miner = AddWorker(Hosted, Mines.Door(mine));
+        miner.Tool = "steel_pick";
+        Hosted.Assign(miner, mine);
+        await Until(() => panel.FindChild("miner_1", true, false) is TextureRect hat && hat.TooltipText == miner.Name,
+            "the first lit hard hat naming the miner underground", 3);
+        var occupied = (TextureRect)panel.FindChild("miner_1", true, false)!;
+        var free = (TextureRect)panel.FindChild("miner_2", true, false)!;
+        Require(occupied.Modulate == Colors.White && free.Modulate == Style.Unready && free.TooltipText == "",
+            "only the occupied mining slot should be lit and named");
+        await Hover(occupied);
+        Require(GetViewport().GuiGetHoveredControl() == occupied, "hovering the lit hard hat should show the miner's name");
+        Hosted.Assign(miner, null);
+        await Until(() => occupied.Modulate == Style.Unready && occupied.TooltipText == "",
+            "the hard hat dimming and clearing the name when the miner comes out", 3);
+        miner.Tool = "";
+        Hosted.Fire(miner);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
 }

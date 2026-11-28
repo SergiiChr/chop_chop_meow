@@ -102,10 +102,14 @@ public sealed class Mines(World world) {
 
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
     private static bool Full(Thing mine) => mine.Output is Inventory output && (output[Ore(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
+    /// <summary>Whether this worker is underground at the given mine.</summary>
+    internal static bool IsUnderground(Worker worker, Thing mine) =>
+        worker.Assignment == mine.Id && worker.WorkState == WorkerWorkState.Underground;
+
     /// <summary>How many workers are mining a mine underground now.</summary>
     public int Underground(Thing mine) {
         int miners = 0;
-        foreach (var w in world.S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
+        foreach (var w in world.S.Workers) if (IsUnderground(w, mine)) miners++;
         return miners;
     }
     /// <summary>Whether an open mine works an ore, as the end goal wants.</summary>

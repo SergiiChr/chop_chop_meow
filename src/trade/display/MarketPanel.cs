@@ -11,21 +11,21 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     protected override void Body() {
         headingTitle.Text = "Trading post";
-        Tab("cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
-        Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
-        Tab("book", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
-        FilterButton();
-        // The filters and the price sheet share the board beside the panel, so the sheet waits while the filters are open.
-        if (memory.SheetOpen && !FiltersOpen) PriceSheet();
+        Tab("trade_cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
+        Tab("menu_crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
+        PriceSheet();
+        FilterButton(FiltersOpen ? Style.SlateTabSelected : Style.SlateTab, inPage: true);
         if (memory.Hiring) HireOffers();
         else Shipping();
         JobButtons();
     }
 
     /// <summary>A round tab in the header, lit while its page is shown.</summary>
-    private void Tab(string glyph, string name, string tooltip, Action action, bool active) {
-        var tab = HeaderAction(glyph, tooltip, () => { action(); Redraw(); }, active ? Style.TabActive : Style.TabRound, name);
+    private void Tab(string icon, string name, string tooltip, Action action, bool active) {
+        var tab = kit.HeaderButton(Icons.Of(icon), tooltip, () => { action(); Redraw(); }, active ? Style.SlateTabSelected : Style.SlateTab, name, tint: null);
         tab.CustomMinimumSize = new Vector2(44, 44);
+        tab.AddThemeConstantOverride("icon_max_width", 28);
+        panel.AddToHeader(tab);
     }
 
     private void Shipping() {
@@ -35,11 +35,10 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), $"{StationSlots.SlotHint}\nPut a packed crate here to sell it", held => held.Stack is { Box: 0 } stack && World.CanSell(stack.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
-        var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.Where(World.IsCrate).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
-        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("line_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
-        sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        var sell = kit.Button("Sell goods", () => { var load = thing.Inventory.Items.Keys.Where(World.IsCrate).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
+        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates";
+        sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         Style.SkinPill(sell, Style.Brick);
-        sell.AddThemeColorOverride("icon_normal_color", Style.Rim); sell.AddThemeColorOverride("icon_hover_color", Style.Rim);
         ship.AddChild(sell);
         var auto = new CheckBox { Text = "Send when full", ButtonPressed = thing.AutoSell, FocusMode = Control.FocusModeEnum.None, Name = "auto_sell", TooltipText = "Send the cart by itself once every slot holds a crate" };
         Style.InkCheck(auto);
@@ -55,7 +54,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
         inbound.AddChild(Style.WellLabel("Inbound"));
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
-        var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
+        var mailbox = Style.Icon(Icons.Of("mailbox"), 30); mailbox.MouseFilter = Control.MouseFilterEnum.Pass; mailbox.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(mailbox);
         mail.AddChild(NewInventoryGrid(() => output, thing, id => moves.Stack(output, world.S.Backpack, id, thing), StationSlots.SlotHint, _ => false, columns: 5));
         BagGrid(id => { if (World.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods in a crate to send them to the village."); }, $"{BagHint}\nShift or Ctrl: put a packed crate on the cart", wanted: World.CanSell);
     }
@@ -73,7 +72,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);
         row.AddChild(Style.Icon(Icons.Of("signpost"), 26));
-        var road = new CartRoad { Name = "cart", Cart = Icons.Of("line_cart"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
+        var road = new CartRoad { Name = "cart", Cart = Icons.Of("trade_cart"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddChild(road);
         row.AddChild(Style.Glyph("line_village", 26, Style.Rim));
         var left = Style.Heading("", 15); left.CustomMinimumSize = new Vector2(40, 0); left.HorizontalAlignment = HorizontalAlignment.Right; row.AddChild(left);
@@ -94,11 +93,13 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
     }
 
     private void HireOffers() {
+        var heading = Style.Heading("Hire a worker", 19); heading.Name = "hire_heading"; AddChild(heading);
         foreach (var offer in world.Data.HireOffers) {
-            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => world.Hire(thing, offer));
+            var hire = kit.Button($"{offer.Wage:0} coins/day.\n{offer.Upfront:0} coins downpayment.", () => world.Hire(thing, offer));
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
-            hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
-            hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}\nPaid from the bank first, then your backpack";
+            hire.CustomMinimumSize = new Vector2(0, 64); hire.Alignment = HorizontalAlignment.Left;
+            hire.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            hire.TooltipText = "Paid from the bank first, then your backpack.";
             AddChild(hire);
         }
         AddLabel("Hiring and wages come out of the bank first, then your backpack. Wages are paid at dawn; unpaid workers strike.", 13, Style.Beige);
@@ -108,13 +109,13 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
     private void PriceSheet() {
         var board = panel.SideBoard(Style.Sign, SheetWidth - 56);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 8); board.AddChild(top);
+        top.AddChild(Style.Icon(Icons.Of("prices"), 26));
         var title = Style.Text("Bramblewick prices", 19, Style.Ink, Style.Head); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         var age = Style.Pill("", Style.Tag(Style.Mustard), Style.Line, 12); top.AddChild(age);
         live.Watch(() => world.PriceAge, days => age.Text = days == 0 ? "today" : days == 1 ? "yesterday" : $"{days} days old");
-        var fetch = kit.Button("→", () => world.FetchPrices(thing)); fetch.Name = "fetch"; fetch.Icon = Icons.Of("line_crew"); fetch.ExpandIcon = true; fetch.CustomMinimumSize = new Vector2(64, 32);
+        var fetch = kit.Button("→", () => world.FetchPrices(thing)); fetch.Name = "fetch"; fetch.Icon = Icons.Of("hardhat_illustration"); fetch.ExpandIcon = true; fetch.CustomMinimumSize = new Vector2(64, 32);
         fetch.AddThemeConstantOverride("icon_max_width", 18); Style.SkinPill(fetch, Style.Enamel);
         top.AddChild(fetch);
-        top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { memory.SheetOpen = false; Redraw(); }, Style.CloseRound, "sheet_close"));
         live.Watch(() => world.FetchBlock(thing), blocked => {
             fetch.Disabled = blocked != null; fetch.TooltipText = blocked ?? "The worker managing deliveries walks to Bramblewick and back with fresh prices.";
         });
@@ -123,7 +124,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         header.AddChild(new Control { CustomMinimumSize = new Vector2(GoodsColumn, 0) });
         foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
-        var sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); panel.ShowSheetRows(sheetScroll, rows, 110);
+        var sheetScroll = new ScrollContainer { Name = "price_rows", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); panel.ShowSheetRows(sheetScroll, rows, 110);
         var coins = Icons.Of(Inventory.Coins);
         foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys)) {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);

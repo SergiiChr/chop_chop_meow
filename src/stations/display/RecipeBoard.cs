@@ -72,7 +72,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         Style.Skin(heading, Style.None, Style.None);
         var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); row.AddThemeConstantOverride("separation", 8);
         heading.AddChild(row);
-        row.AddChild(new Chevron { Open = open, CustomMinimumSize = new Vector2(14, 14), SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore });
+        var chevron = Style.Glyph(Style.DisclosureGlyph(open), 14, Style.Beige);
+        chevron.SizeFlagsVertical = SizeFlags.ShrinkCenter; chevron.MouseFilter = MouseFilterEnum.Ignore; row.AddChild(chevron);
         row.AddChild(Style.Text(group.ToString(), 15, Style.Beige, Style.Head));
         var count = Style.Pill(ids.Count.ToString(), Style.CountPill, Style.Beige, 11); count.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(count);
         if (!open && station != null && ids.Contains(station.Keep)) {
@@ -177,20 +178,6 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         cell.Popup = () => new RecipePopup(world, station, r, Seconds(r), Hint);
         live.Bind(shown => cell.TooltipText = shown, Describe);
         return cell;
-    }
-}
-
-/// <summary>A small arrow that points down beside an open group and right beside a closed one.</summary>
-public partial class Chevron : Control {
-    public bool Open { get; set; }
-
-    public override void _Draw() {
-        var mid = Size / 2;
-        float reach = Math.Min(Size.X, Size.Y) * .32f;
-        var points = Open
-            ? new[] { mid + new Vector2(-reach, -reach / 2), mid + new Vector2(0, reach / 2), mid + new Vector2(reach, -reach / 2) }
-            : new[] { mid + new Vector2(-reach / 2, -reach), mid + new Vector2(reach / 2, 0), mid + new Vector2(-reach / 2, reach) };
-        DrawPolyline(points, Style.Beige, 2.5f, true);
     }
 }
 

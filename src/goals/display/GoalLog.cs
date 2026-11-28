@@ -30,7 +30,13 @@ public partial class GoalLog : VBoxContainer {
         list.AddThemeConstantOverride("separation", 8); scroll.AddChild(list);
         active.AddThemeConstantOverride("separation", 5); list.AddChild(active);
         explore = Style.Text("Explore to unlock more goals.", 14, Style.Tan, wrap: true); list.AddChild(explore);
-        disclosure = Row("▸  Completed", ToggleCompleted); disclosure.Name = "goal_completed"; list.AddChild(disclosure);
+        disclosure = Row("Completed", ToggleCompleted); disclosure.Name = "goal_completed";
+        disclosure.Icon = Icons.Of(Style.DisclosureGlyph(false)); disclosure.ExpandIcon = true;
+        disclosure.AddThemeConstantOverride("icon_max_width", 14);
+        disclosure.AddThemeColorOverride("icon_normal_color", Style.Ink);
+        disclosure.AddThemeColorOverride("icon_hover_color", Style.Ink);
+        disclosure.AddThemeColorOverride("icon_pressed_color", Style.Ink);
+        list.AddChild(disclosure);
         completed.Visible = false; completed.AddThemeConstantOverride("separation", 5); list.AddChild(completed);
 
         Details = new Control { Name = "goal_details", Visible = false };
@@ -73,7 +79,7 @@ public partial class GoalLog : VBoxContainer {
 
     private void ToggleCompleted() {
         completed.Visible = !completed.Visible;
-        disclosure.Text = completed.Visible ? "▾  Completed" : "▸  Completed";
+        disclosure.Icon = Icons.Of(Style.DisclosureGlyph(completed.Visible));
     }
 
     /// <summary>Opens the window with a goal's details over the log.</summary>

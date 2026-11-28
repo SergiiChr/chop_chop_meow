@@ -105,14 +105,21 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     }
 
     /// <summary>A round button in a panel's header, with a line icon.</summary>
-    public Button HeaderButton(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
+    public Button HeaderButton(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") =>
+        HeaderButton(GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg"), tooltip, action, look, name,
+            look.Normal == Style.FilterRound.Normal ? Style.Ink : Style.Rim);
+
+    /// <summary>A round button in a panel's header whose icon keeps its own colors unless tinted.</summary>
+    public Button HeaderButton(Texture2D? icon, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name, Color? tint) {
         var button = Button("", action); button.TooltipText = tooltip; button.CustomMinimumSize = new Vector2(38, 38); button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         if (name != "") button.Name = name;
         Style.Skin(button, look.Normal, look.Hover);
-        button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg"); button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center;
+        button.Icon = icon; button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center;
         button.AddThemeConstantOverride("icon_max_width", 18);
-        button.AddThemeColorOverride("icon_normal_color", look.Normal == Style.FilterRound.Normal ? Style.Ink : Style.Rim);
-        button.AddThemeColorOverride("icon_hover_color", look.Normal == Style.FilterRound.Normal ? Style.Ink : Style.Rim);
+        if (tint is Color color) {
+            button.AddThemeColorOverride("icon_normal_color", color);
+            button.AddThemeColorOverride("icon_hover_color", color);
+        }
         return button;
     }
 }

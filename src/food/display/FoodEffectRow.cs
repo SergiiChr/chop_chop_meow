@@ -2,7 +2,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Active food effects under the needs plate, with one badge per effect.</summary>
+/// <summary>Active food effects beside the Layer switch, with one badge per effect.</summary>
 public partial class FoodEffectRow : HBoxContainer {
     private readonly World world;
 
@@ -10,6 +10,7 @@ public partial class FoodEffectRow : HBoxContainer {
         this.world = world;
         Name = "food_effects";
         MouseFilter = MouseFilterEnum.Ignore;
+        SizeFlagsVertical = SizeFlags.ShrinkCenter;
         AddThemeConstantOverride("separation", 5);
         foreach (var effect in FoodEffects.All) AddChild(new FoodEffectBadge(world, effect));
         Refresh();

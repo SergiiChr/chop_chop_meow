@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -47,11 +46,17 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
             } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.Mines.StageSeconds * 100)).Append("% done"), 14, Style.Beige);
             BagGrid(id => world.Mines.Supply(thing, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: deliver a stack · Ctrl: all the mine needs", wanted: id => world.Mines.Need(thing, id) > 0);
         } else {
-            // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.
             var crew = Row(); crew.AddThemeConstantOverride("separation", 8);
-            var tunnel = Style.Glyph("line_tunnel", 28, Style.Rim); tunnel.MouseFilter = Control.MouseFilterEnum.Pass; tunnel.TooltipText = "Miners underground"; crew.AddChild(tunnel);
-            var hats = Enumerable.Range(0, data.Workers).Select(_ => Style.Icon(Icons.Of("hardhat"), 30)).ToArray();
-            foreach (var hat in hats) crew.AddChild(hat);
+            var hats = new TextureRect[data.Workers];
+            var names = new string?[hats.Length];
+            var hardHat = Icons.Of("hardhat");
+            for (int i = 0; i < hats.Length; i++) {
+                var hat = Style.Icon(hardHat, 30);
+                hat.Name = $"miner_{i + 1}";
+                hat.MouseFilter = Control.MouseFilterEnum.Pass;
+                hat.Modulate = Style.Unready;
+                crew.AddChild(hats[i] = hat);
+            }
             var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 36);
             var rates = new Label[2]; var bars = new ColorRect[2]; var items = new[] { Mines.Ore(thing), "stone" };
             for (int i = 0; i < 2; i++) {
@@ -70,10 +75,26 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                     cell.TooltipText = $"{world.Data.Name(item)} · {drawn}/{thing.Output!.StackSize}\nClick to take · mining stops when either is full";
                 });
             }
-            live.Watch(() => world.Mines.Underground(thing), now => {
-                for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Style.Unready;
-                rates[0].Text = rates[1].Text = $"{MathF.Round(now / data.Seconds * 100) / 100} /s";
+            int shownCount = -1;
+            live.Add(() => {
+                int count = 0;
+                foreach (var worker in world.Workers) {
+                    if (!Mines.IsUnderground(worker, thing)) continue;
+                    if (count < hats.Length) ShowHat(count, worker.Name);
+                    count++;
+                }
+                for (int i = count; i < hats.Length; i++) ShowHat(i, null);
+                if (count == shownCount) return;
+                shownCount = count;
+                rates[0].Text = rates[1].Text = $"{MathF.Round(count / data.Seconds * 100) / 100} /s";
             });
+
+            void ShowHat(int index, string? name) {
+                if (name == names[index]) return;
+                names[index] = name;
+                hats[index].Modulate = name == null ? Style.Unready : Colors.White;
+                hats[index].TooltipText = name ?? "";
+            }
         }
         JobButtons();
     }
