@@ -52,7 +52,7 @@ Models are assembled from code-built or baked Godot meshes.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
   fists while digging. The rake reuses its tool-rack mesh and is laid through both fists while raking.
-- `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
+- `src/intro/IntroSets.cs` — the intro film's office floor, rented room, alley and train car, and its baseball bat.
 - `src/intro/display/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/intro/display/Catgirl.cs` — a catgirl of that page: the person model's slim build with a face, hair, cat ears,
   a tail and hands with fingers.
@@ -404,7 +404,7 @@ Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound 
 
 ### Intro film
 
-`intro.ogv` is the intro film the game opens with: 480×270, 15 frames a second, Ogg Theora with Vorbis sound.
+`intro.ogv` is the intro film the game opens with: 960×540, 30 frames a second, Ogg Theora with Vorbis sound.
 It is made from frames the game draws ([README](../README.md#intro-film)); make it again after changing a model it
 shows.
 
@@ -413,6 +413,9 @@ them out of the game.
 
 - `hit.mp3`, `boss.mp3` and `bag.mp3` — the bat on the computer, the boss yelling and a bag being packed and zipped,
   supplied for this project.
+- `tinnitus.ogg` — 4.4 seconds of Klangkobold’s “Tinnitus”. It builds under the boss’s voice and carries into the stare.
+  [Pixabay recording](https://pixabay.com/sound-effects/film-special-effects-tinnitus-7048/) ·
+  [Original recording, CC0](https://freesound.org/people/Klangkobold/sounds/455304/).
 - `train.mp3` — six seconds of "Inside old train" by kokoreli777 (Pixabay 169418).
 - `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
 - `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over

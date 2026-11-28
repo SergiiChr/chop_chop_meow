@@ -352,7 +352,10 @@ Checks and review tools:
 | `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, outside it or inside behind it, moved by a script and run by the game's rules |
 | `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, feeding on one they brought down, following one with a torch, assembling a pack at a campfire, and fighting one with an axe |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
-| `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
+| `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room, alley and train car, and the poses nobody strikes in the game |
+| `src/intro/BossFace.cs` | The boss's face, with a mouth that moves as he shouts and teeth that come loose in the close-up |
+| `src/intro/FilmFace.cs` | The film's close-up eyes and brows, with the gaze and expression set per pose |
+| `src/intro/IntroLandscape.cs` | The film's trail dressing and shore stones, independent of the playable map |
 | `src/intro/display/CatgirlPage.cs` | The web page on the hero's screen in the film: three catgirls dancing inside a browser window |
 | `src/intro/display/Catgirl.cs` | A catgirl of that page: face, hair, ears, tail, hands with fingers and one of three outfits on the person model's slim build |
 | `src/intro/display/CatgirlDance.cs`, `src/intro/display/DanceFrame.cs` | The catgirls' dances: one the two at the sides do in step, and the solo of the one in the middle; and a moment of a dance |
@@ -1895,8 +1898,35 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   drawn.
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
-- New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
+- New for the film: the office, the rented room, the alley and the train car (`IntroSets`), a baseball bat, the boss
   (`ActorSkin.Boss`), the catgirls (`Catgirl`) and the poses in `IntroPoses`.
+- During the rant the boss looks from the hero to the monitor, points it out and waits for an answer.
+  His mouth follows the recorded speech. A ring builds under the final 1.4 seconds and carries through the hero's
+  three-second stare into the lens.
+- Both elbows hold their overhead bend as the hero swings the bat down. The barrel meets the top of the monitor and
+  carries out to the side. As he leaves the desk, he raises the bat to his right shoulder (`SmashShot`).
+- The bat starts to slow in the wide shot before the camera cuts closer (`BossImpactShot`). The higher grip keeps the
+  barrel clear of the boss's lowered hands as it sweeps from screen right to left. The barrel slows and changes angle
+  as it slides along the cheek. The brow and jaw fold around it at contact, and four teeth tumble out of the mouth on
+  different paths (`BossFace`).
+  The wide shot returns to the bat behind the hero's left shoulder and the boss already falling. The hero lowers and
+  drops the bat, pushing into his run before the cut to the aisle. The boss curls on the carpet as the hero turns right
+  past the last cubicle and runs along the wall. Some clerks rise from their desks to watch him (`OfficeEscapeShot`).
+- At home at night, the hero hurries to pack under cool window light and a warm bedside lamp.
+  He keeps checking the door, the camera cuts close to the zipper, and he swings the pack up onto his back
+  (`PackingShot`).
+- After packing, the hero sneaks through the alley with his pack on (`AlleyShot`).
+  Alternating red and blue police lights spill from beyond the far corner onto brick and wet pavement.
+  The hero sees the flashes and turns right into a dim side passage. The puddles follow the gravel height map.
+- The hero walks past the ferns, stops to pick berries and is seen farther down the trail in a tracking shot.
+  He plucks a cluster off a real twig of the game's berry bush and tips the fruit into his other hand
+  (`BerryPickingShot`).
+  The next shot follows that hand as he pops the berries into his mouth and chews without breaking stride
+  (`ForestDepartureShot`).
+  The track runs between ferns and canopies, with stones pressed into the earth and leaf litter along its margins.
+  The trail and shore dressing belongs to the film (`IntroLandscape`).
+  After the campfire, the camera cuts closer to two wolves approaching beyond the firelight.
+  Their silhouettes and eyes show until the fade (`ShowNightWolves`).
 - The hero's screen shows a web page of three catgirls dancing (`CatgirlPage`). The page is a small world of its own,
   drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while his screen is seen.
   All three catgirls (`Catgirl`) share the same slim build (`HumanShape.Slim`), with a shaped face, defined shoulders,
@@ -1928,8 +1958,8 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   Each thigh tips out on its own through `Pose.SplayL` and `Pose.SplayR`.
   `Catgirl` adds wrists that bend, twist and tip, a head that nods, turns and tilts, and a turn of the whole body.
   A `DanceFrame` also holds where the dancer stands, so the soloist can move her weight over a planted leg.
-- The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
-  shrinks them.
+- The paint filter is drawn slightly wider over the source frames (`WorldView.IntroPaintWidth`) so it keeps the game's
+  look at playback size.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
   sky,
   since the game's sky is one flat colour that only a view from above hides.

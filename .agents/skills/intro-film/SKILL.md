@@ -24,7 +24,7 @@ this project turns them into the movie.
    For the catgirl's solo dance (`CatgirlDance.Solo`), `./tools/intro_film.py --dance` draws only her, as tall as
    the picture, into `build/intro/dance`, and writes the beat she dances to into its cue sheet.
    Work on the dance there and draw the film only once it is approved.
-3. When the stills are right, draw the whole film (about 50 seconds) and look at each changed shot as a strip of
+3. When the stills are right, draw the whole film (about a minute) and look at each changed shot as a strip of
    frames:
 
    ```sh
@@ -36,7 +36,8 @@ this project turns them into the movie.
    ```sh
    T=~/projects/agents/skills
    $T/retro-movie/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv \
-       --sounds assets/sounds --sounds assets --gain 6 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
+       --movie-size 960x540 --movie-fps 30 --quality 3 \
+       --sounds assets/sounds --sounds assets --gain 5 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
    ```
 
 5. Play it in the real window with the `playtest` skill: a shot of the film right after launch, Esc, a shot of the menu.
@@ -66,14 +67,19 @@ Times are from the film's start; a change to a shot's length moves every later s
 | 7.5 | Catgirls dancing on his screen | `ScreenShot` |
 | 12.5 | Boss yelling | `BossShot` |
 | 16.5 | Blank stare | `StareShot` |
-| 18.5 | Bat and run | `SmashShot` |
-| 21.5 | Packing at home | `PackingShot` |
-| 26.5 | Train | `TrainShot` |
-| 29.5 | Forest trail | `ForestShot` |
-| 32.5 | Arrival at the shore | `ArrivalShot` |
-| 36.9 | Touching the sea, fade | `ShoreShot` |
-| 40.5 | Black | |
-| 42.5 | Night by the fire, fade | `NightShot` |
+| 19.5 | Monitor smash | `SmashShot` |
+| 21.9 | Boss impact in slow motion | `BossImpactShot` |
+| 25.5 | Escape down the office aisle | `OfficeEscapeShot` |
+| 27.5 | Packing at home at night | `PackingShot` |
+| 32.5 | Alley at night | `AlleyShot` |
+| 36.5 | Train | `TrainShot` |
+| 39.5 | Forest approach | `ForestApproachShot` |
+| 42.5 | Picking berries | `BerryPickingShot` |
+| 45.2 | Eating berries on the trail | `ForestDepartureShot` |
+| 48 | Arrival at the shore | `ArrivalShot` |
+| 52.4 | Touching the sea, fade | `ShoreShot` |
+| 56 | Black | |
+| 58 | Night by the fire, wolves and fade | `NightShot` |
 
 ## What goes wrong
 

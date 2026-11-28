@@ -65,7 +65,7 @@ internal static class WolfShape {
     private static Skin? skin;
 
     /// <summary>A new skeleton in its resting pose under <paramref name="parent"/>, wearing the shared fur and eyes.</summary>
-    public static Skeleton3D Build(Node3D parent) {
+    public static Skeleton3D Build(Node3D parent, StandardMaterial3D? eyeShine = null) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         for (int i = 0; i < Bones.Length; i++) {
@@ -79,7 +79,7 @@ internal static class WolfShape {
         fur ??= BuildFur();
         eyes ??= BuildEyes();
         skeleton.AddChild(new MeshInstance3D { Mesh = fur, MaterialOverride = Fur, Skin = skin, Skeleton = new NodePath("..") });
-        skeleton.AddChild(new MeshInstance3D { Mesh = eyes, MaterialOverride = EyeShine, Skin = skin, Skeleton = new NodePath(".."), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        skeleton.AddChild(new MeshInstance3D { Mesh = eyes, MaterialOverride = eyeShine ?? EyeShine, Skin = skin, Skeleton = new NodePath(".."), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         return skeleton;
     }
 

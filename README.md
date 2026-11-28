@@ -111,20 +111,27 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ### Intro film
 
-The game opens with a film of about 50 seconds, `assets/intro.ogv`, played over the start menu; Esc skips it.
-It shows the hero bored at his office desk, his hand on the mouse, the catgirls dancing on his screen, his boss yelling
-at him, his blank stare, the bat he takes to his computer, packing at home, the train, the walk through the forest, the
-shore where he squats to touch the sea, and a cold first night by a fire with wolves howling.
-It is made to look like a movie on a 1990s console: small frames, 15 a second, lightly blocky from compression.
+The game opens with a 67-second film, `assets/intro.ogv`, played over the start menu.
+Esc skips it.
+Bored at his office desk, the hero watches catgirls dance on his screen until the boss yells at him.
+A ring builds under the boss’s last words and takes over as the hero looks into the camera.
+He smashes the monitor, then hits the boss across the face with the bat.
+The swing slows before the camera cuts close. The boss's cheek folds around the barrel and teeth tumble from his mouth.
+The hero drops the bat and runs down the aisle as the boss folds onto the carpet, then turns right along the wall.
+That night he rushes to pack, looking at the door. In the alley he sees red and blue light spill around the corner
+onto the wet pavement and turns right into a side passage.
+He takes the train out to the forest and picks berries along a leaf-strewn trail.
+He eats them as he walks down to the shore, then touches the sea.
+On his first night by the fire, the silhouettes and eyes of approaching wolves appear beyond the firelight.
+The film keeps the game's painted look, with sharper faces and textures in close-up.
 
 The game draws the film itself, so a change to a model or a shot means making the movie again:
 
 1. `./tools/intro_film.py` draws the frames, 30 a second, and writes the cue sheet of the film's sounds beside them.
-   The paint filter is drawn over them 21 pixels wide, not the game's 8, so its strokes are still there after step 2
-   shrinks them.
-2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`: keep every second frame, shrink it to 480×270,
-   pack each as a JPEG so its blocks just show, mix the cue sheet's sounds from `assets/sounds` and `assets`, and write
-   Ogg Theora, which the game plays and blows up to the window.
+   The paint filter is 11 pixels wide on those frames, close to the game's 8 after the movie tool shrinks them.
+2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`.
+   It keeps all 30 frames a second at 960×540, mixes the cue sheet's sounds from `assets/sounds` and `assets`, and
+   writes Ogg Theora, which the game scales to the window.
    The movie tool is not part of this project; the `intro-film` skill (`.agents/skills/intro-film`) has the commands.
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
