@@ -856,6 +856,9 @@ public static class ActorAnimation {
         return pose.WithLegs(Stood(feet.Left - pose.HipShift, hips), Stood(feet.Right - pose.HipShift, hips)) with { Hips = hips };
     }
 
+    /// <summary>Places the boots at fixed points in a film pose while its hips shift over them.</summary>
+    internal static Pose OnFeet(Pose pose, float left, float right) => OnFeet(pose, new Footing(left, right));
+
     // A runner braking: the hips this high, the left heel dug in this far ahead of them with the toes up this many degrees,
     // and the right boot on its toe this far behind with the heel lifted this many degrees.
     private const float BrakeHips = .652f;

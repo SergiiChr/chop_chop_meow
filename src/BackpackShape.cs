@@ -8,6 +8,18 @@ internal static class BackpackShape {
     private static ArrayMesh? details, flap;
     public static Mesh Details => details ??= BuildDetails();
     public static Mesh Flap => flap ??= BuildFlap();
+    private const float FlapHalfWidth = .145f, FlapRow = .095f;
+    private static float FlapHeight(float across) => .022f + .035f * (1 - across * across);
+
+    /// <summary>A point on the flap's cross seam, with across running from -1 to 1.</summary>
+    public static Vector3 FlapSeam(float across) {
+        // Interpolate along the flat faces the canvas is built from.
+        float span = Mathf.Abs(across) * 2;
+        int strip = Mathf.FloorToInt(span);
+        float height = Mathf.Lerp(FlapHeight(strip * .5f), FlapHeight((strip + 1) * .5f), span - strip);
+        return new Vector3(across * FlapHalfWidth, height, 2 * FlapRow);
+    }
+
     public static readonly StandardMaterial3D Canvas = ModelKit.Vertex(Surface.Cloth, .95f);
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
@@ -37,8 +49,8 @@ internal static class BackpackShape {
             for (int col = 0; col < 4; col++) {
                 Vector3 Point(int x, int z, float drop = 0) {
                     float across = (x - 2) / 2f;
-                    float width = z == 3 ? .11f : .145f;
-                    return new(across * width, .022f + .035f * (1 - across * across) - drop, z * .095f);
+                    float width = z == 3 ? .11f : FlapHalfWidth;
+                    return new(across * width, FlapHeight(across) - drop, z * FlapRow);
                 }
                 Quad(s, Point(col, row), Point(col + 1, row), Point(col + 1, row + 1), Point(col, row + 1), Vector3.Up, row == 2 ? "788253" : "7d8858");
                 Quad(s, Point(col, row, .008f), Point(col, row + 1, .008f), Point(col + 1, row + 1, .008f), Point(col + 1, row, .008f), Vector3.Down, "525f39");

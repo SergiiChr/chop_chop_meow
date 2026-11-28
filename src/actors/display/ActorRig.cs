@@ -59,8 +59,12 @@ public sealed class ActorRig {
     /// <summary>Where the chest turns on the belly, from the hips.</summary>
     private readonly Vector3 waist;
     public Node3D Head => head;
+    /// <summary>The ordinary eyes and brows, which close-ups can replace without changing the rig.</summary>
+    internal Node3D FaceMarks { get; }
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
+    /// <summary>The pack itself, without the straps on the torso.</summary>
+    internal Node3D? WornPackBody { get; private set; }
 
     /// <summary>The colours each kind of person in the game is drawn in.</summary>
     public static Outfit OutfitOf(ActorSkin skin) => skin switch {
@@ -150,6 +154,7 @@ public sealed class ActorRig {
         }
         head = Pivot(chest, build.HeadOffset);
         head.Scale = build.HeadScale;
+        FaceMarks = Pivot(head, Vector3.Zero);
         if (build.Head is { } face) ActorShape.Add(head, face, material: Mat(outfit.Skin));
         else Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(outfit.Skin), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, build.Nose, new Vector3(0, .12f, .115f), Mat(outfit.Skin), new Vector3(.7f, 1, 1), 8);
@@ -201,7 +206,7 @@ public sealed class ActorRig {
                 new Vector3(side * .14f, .205f, .04f), new Vector3(side * .15f, .21f, -.04f),
                 new Vector3(side * .115f, .22f, -.15f) });
         }
-        var pack = Pivot(worn, new Vector3(0, .32f, -.17f));
+        var pack = WornPackBody = Pivot(worn, new Vector3(0, .32f, -.17f));
         ActorShape.Backpack(pack);
         return worn;
     }
@@ -210,7 +215,10 @@ public sealed class ActorRig {
     private void BuildBossDetails(string skinTone, string hair, string shirt) {
         BuildFace(skinTone, hair);
         Sphere(head, .122f, new Vector3(0, .15f, -.04f), Mat(hair), new Vector3(1.02f, .62f, .88f), 16);
-        Box(head, new Vector3(.075f, .016f, .014f), new Vector3(0, .088f, .112f), Mat(hair));
+        foreach (float side in new[] { -1f, 1f }) {
+            var moustache = Sphere(head, .022f, new Vector3(side * .017f, .089f, .11f), Mat("716b66"), new Vector3(1, .35f, .39f), 12);
+            moustache.RotationDegrees = new Vector3(0, side * 8, -side * 11);
+        }
         Sphere(torso, .15f, new Vector3(0, .23f, .045f), Cloth(shirt), new Vector3(1.05f, 1, .85f), 12);
         Tie(torso, "8e2a2a").Position += new Vector3(0, 0, .045f);
     }
@@ -226,8 +234,8 @@ public sealed class ActorRig {
     private void BuildFace(string skinTone, string hair) {
         foreach (float side in new[] { -1f, 1f }) {
             Sphere(head, .025f, new Vector3(side * .11f, .125f, 0), Mat(skinTone), new Vector3(.7f, 1, .8f), 8);
-            Box(head, new Vector3(.022f, .024f, .012f), new Vector3(side * .046f, .145f, .108f), Mat("302b28"));
-            Box(head, new Vector3(.036f, .009f, .014f), new Vector3(side * .047f, .171f, .102f), Mat(hair));
+            Box(FaceMarks, new Vector3(.022f, .024f, .012f), new Vector3(side * .046f, .145f, .108f), Mat("302b28"));
+            Box(FaceMarks, new Vector3(.036f, .009f, .014f), new Vector3(side * .047f, .171f, .102f), Mat(hair));
         }
     }
 
@@ -342,6 +350,10 @@ public sealed class ActorRig {
         skin.SetBonePoseRotation(1, knee.Quaternion);
         skin.SetBonePoseRotation(2, (shinBasis.Transposed() * boot).GetRotationQuaternion());
     }
+
+    /// <summary>Where the knee joint sits in the rig's root frame.</summary>
+    internal Vector3 KneeJoint(bool left) =>
+        hips.Transform * ((left ? legL : legR).Transform * (left ? kneeL : kneeR).Position);
 
     /// <summary>The two ends of a drawn boot sole in the rig's root frame.</summary>
     internal (Vector3 Toe, Vector3 Heel) BootSole(bool left) {
