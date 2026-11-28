@@ -21,6 +21,7 @@ public partial class Game {
         Require(Named("coins") != null, "The market must offer a coins button.");
         Require(Named("hardhat") != null, "The market must offer a hire button.");
         Require(Named("prices") != null, "The market must offer a prices button.");
+        await ShowBackpack();
         await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·"))));
         Require(sign.Inventory.Count == 0 && world.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
         await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries"))));

@@ -186,7 +186,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a planting hole or gather sand |
 | Left mouse button | Select a resource, building, crate or worker, or place a selected building. Put a held stack into the storage clicked, or let go of it anywhere else. On a piece of paper, walk over and pick it up |
 | B | Open building plans, and the remove selector that takes buildings down |
-| Tab | Open or close the backpack |
+| Tab | Open or close the backpack. With a page open, show or hide it under that page |
 | C / V during placement | Turn a building, crate, barrel or pipe 90° |
 | C outside placement | Open crafting |
 | LMB / RMB while placing steel pipes | Lay a pipe / take up the pipe under the pointer |
@@ -308,7 +308,18 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
 - Click over open ground to place a held crate, barrel or building plan.
   Moving back over the interface returns it to the cursor.
 - A press on one slot let go of anywhere else, such as over another slot, does nothing.
-- Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
+- Drag an empty spot on the side panel or the backpack drawer to move it. Both go back to their usual spots for each new page or building.
+- The backpack shows under any page while you have it open. Opening a page, such as a building, a worker or the
+  crafting menu, leaves it open or closed, as it was.
+  Storage opens it: chests, placed crates, barrels, piles, the tool station, the recovery box, and a crate or barrel
+  opened from the backpack.
+  With a page open, Tab shows or hides the backpack under it, and the page stays.
+  A storage's item list hides the backpack to make room. Tab shows it again, and the list gets shorter.
+- A building's tool slots, roof barrel and Plumbing slot sit in the Tools window left of its page.
+  It opens rolled up below the page's title, as a roll with an arrow and "Tools" written up its side.
+  A click on the roll unrolls the window until it lies flat, keeping the arrow and the word on its left edge, and
+  another click rolls it back up.
+  Each building opens it rolled up.
 - Double-click to eat, drink one liter, light a torch, open a crate or barrel, or select a tool in its hotbar slot or directly in hand.
   A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/world/model/GameTables.cs`.
@@ -333,7 +344,7 @@ Hovering a card shows what the recipe requires, how long it takes, what its prod
 | in your backpack (yellow) | The station's slot is empty and you carry the tool: you can work the recipe, a worker cannot |
 | not available (red) | Neither slotted nor carried; a tool made by hand with no tool, such as the stone chisel, says what it takes |
 
-A station's tool slots sit in a small window of their own left of its page, "Available tools", each with the tool it holds.
+A station's tool slots sit in the Tools window left of its page, "Available tools", each with the tool it holds.
 
 | Input on a card | At a station | In the crafting menu |
 | --- | --- | --- |
@@ -455,7 +466,7 @@ A cabin someone is in, or a trading post with a cart out, stays up until they co
 A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes.
 Raw meat cannot be eaten.
 Your refillable bottle holds three liters, each restoring one third of the water gauge.
-Put a steel barrel into the Roof barrel window to the left of the cabin page to mount it on the roof.
+Put a steel barrel into the Roof barrel slot in the Tools window to the left of the cabin page to mount it on the roof.
 At bedtime, the barrel serves everyone's thirst first and fills bottles second, both in the order they entered.
 When players wake, any water left in the barrel goes to their thirst in the same order.
 Taking down a cabin returns its barrel with its water.
@@ -1067,7 +1078,7 @@ Pipes join across a shared tile side when both openings face each other.
 Run the line through the tile outlined in blue under the pump and each building it serves.
 A vertical pipe joins each building with plumbing to the line.
 A dotted guide marks an open connection.
-Put 10 steel pipes in a building's **Plumbing** slot to install its plumbing.
+Put 10 steel pipes in a building's **Plumbing** slot, in the Tools window beside its page, to install its plumbing.
 You can add them in batches.
 Removing steel pipes from the slot disables the building's plumbing.
 Taking down the building or picking up a barrel gives the installed steel pipes back.

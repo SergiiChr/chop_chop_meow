@@ -38,16 +38,16 @@ public partial class CabinPanel(PageTools tools, Thing subject) : SleepPage(tool
             door.Disabled = sleeping;
             key.Visible = inside && !sleeping;
         });
-        BarrelWindow();
+        RoofBarrelSlot();
         StoreBagGrid(Barrel.Is);
         JobButtons();
         RedrawOnChange(() => Barrel.In(thing.Inventory) != null);
 
     }
 
-    /// <summary>The roof barrel's slot and fill, beside the cabin page.</summary>
-    private void BarrelWindow() {
-        var window = panel.ShowAside(190);
+    /// <summary>The roof barrel's slot and fill, in the Tools window beside the cabin page.</summary>
+    private void RoofBarrelSlot() {
+        var window = panel.ShowTools(190);
         window.AddChild(Style.Heading("Roof barrel", 19));
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);

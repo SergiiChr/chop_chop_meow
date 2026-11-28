@@ -201,6 +201,12 @@ public partial class Game {
         Require(!view.ShowsPlayer(host), "The start menu must not show the players of the game left behind.");
     }
 
+    /// <summary>
+    /// How far <paramref name="point"/>, in the world, is from the nearest face of a rock where it rests, in metres.
+    /// A blow shakes the rock sideways for a moment after it lands, so the shake is left out.
+    /// </summary>
+    private static float RestingGap(Prop rock, Vector3 point) => SurfaceGap(rock.Body, point + rock.Root.GlobalTransform.Basis * rock.Body.Position);
+
     /// <summary>How far <paramref name="point"/>, in the world, is from the nearest face of a model's visible meshes, in metres.</summary>
     private static float SurfaceGap(Node node, Vector3 point) {
         float nearest = float.MaxValue;

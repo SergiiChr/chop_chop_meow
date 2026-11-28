@@ -37,6 +37,7 @@ public partial class Game {
     private async Task<Thing> PlantAndWater(Thing hole, string bucket) {
         await ClickOn(hole);
         Require(OnPage("input_acorn") is ItemSlot { Visible: true }, "the dug hole should show an acorn slot");
+        await ShowBackpack();
         await Carry(BagCell(c => c.TooltipText.StartsWith("Acorn")), OnPage("input_acorn")!);
         await Until(() => world.Find(hole.Id) == null && world.ThingsOf(ThingKind.Tree).Any(t => t.Pos == hole.Pos),
             "one acorn replacing the hole with a planted tree", 4);
@@ -46,10 +47,11 @@ public partial class Game {
         await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && ShowsResourceStock("wood", "0"),
             "the planted tree showing its status, wood count, and water needed", 4);
         Require(!HasLabel(panel, "Pour from a filled bottle or bucket"), "the water amount should be enough text beside the slot");
+        await ShowBackpack();
         await Carry(BagCellOf(bucket), OnPage($"input_{Water.Liquid}")!);
         await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0
-            && OnPage($"input_{Water.Liquid}") == null && !bag.Visible,
-            "the tree showing Growing and closing its watering controls after the bucket is poured", 4);
+            && OnPage($"input_{Water.Liquid}") == null && bag.Visible,
+            "the tree showing Growing and closing its watering controls after the bucket is poured, with the backpack still open under it", 4);
         Require(!HasLabel(panel, "/10 days"), "the tree panel should leave out the day count");
         return tree;
     }

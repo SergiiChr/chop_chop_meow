@@ -36,8 +36,13 @@ public partial class Game {
 
     /// <summary>Window position of a control's centre, scrolled into view first.</summary>
     private async Task<Vector2> At(Control control) {
+        Require(control.IsVisibleInTree(), $"{control.Name} must be on screen for the pointer to reach it.");
         for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
         await Frames();
+        // A control cut off by a parent that clips, such as a folded Tools window, takes no pointer there.
+        var centre = control.GetGlobalRect().GetCenter();
+        for (Node? n = control.GetParent(); n != null; n = n.GetParent())
+            Require(n is not Control { ClipContents: true } clip || clip.GetGlobalRect().HasPoint(centre), $"{control.Name} must not be cut off by {n.Name} for the pointer to reach it.");
         return WindowPoint(control);
     }
 

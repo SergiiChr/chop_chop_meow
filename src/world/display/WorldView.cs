@@ -1327,7 +1327,7 @@ public partial class WorldView : Node3D {
     private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
 
     /// <summary>Whether a thing is a rock or ore deposit, mined down piece by piece until it breaks apart.</summary>
-    private static bool Mined(ThingKind kind) => kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin;
+    internal static bool Mined(ThingKind kind) => kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin;
 
     /// <summary>The colour of a rock's chips, by the stone or ore it is.</summary>
     private static string RockColor(ThingKind kind) =>

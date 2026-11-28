@@ -181,6 +181,7 @@ public partial class Game {
         Require(packer.Packs == "berries", "Picking berries must set what the station packs.");
         Require(Named("pack_berries") == null, "Picked berries must leave the list of goods to pack.");
         Require(Named("packed_crate") != null, "The station must show the crate being packed.");
+        await ShowBackpack();
         await Holding(Key.Shift, () => Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·"))));
         await Until(() => packer.Inventory["berries"] > 0, "Shift on berries in the backpack loading them into the packing station", 2);
         int soundsBefore = sounds.Played;
@@ -214,7 +215,7 @@ public partial class Game {
     private async Task CheckBenchLoadsInputsByClickDoubleClickAndSplit() {
         await CloseWithEsc();
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "crate"); Give(Hosted, "planks", 6);
-        await ClickOn(workbench);
+        await ClickOn(workbench); await ShowBackpack();
         await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood planks")));
         await RightClick(Named("input_planks")!);
         await Until(() => workbench.Inventory["planks"] == 1, "a right click with planks held putting one in the input slot", 2);
@@ -232,7 +233,7 @@ public partial class Game {
     private async Task CheckOutputSlotTakesBackOnlyWhatTheRecipeMakes() {
         await CloseWithEsc();
         var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(bench, "planks"); Give(Hosted, "planks", 4); Give(Hosted, "stone", 1);
-        await ClickOn(bench);
+        await ClickOn(bench); await ShowBackpack();
         await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood planks")));
         await Click(Named("output_planks")!);
         await Until(() => bench.Inventory["planks"] == 4 && cursor.Empty, "planks put on the bench's output slot going back into it", 2);
@@ -397,20 +398,21 @@ public partial class Game {
         await CloseWithEsc(); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
         await ClickOn(workbench);
-        var slot = panel.Aside.FindChild("tool_chisel", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Available tools") && HasLabel(panel.Aside, "Empty"), "A bench must show its empty tool slots in a window beside its page.");
-        Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The tool window must stand left of the page.");
+        var slot = panel.ToolsWindow.FindChild("tool_chisel", true, false) as ItemSlot;
+        Require(panel.ToolsWindow.Visible && slot != null && HasLabel(panel.ToolsWindow, "Available tools") && HasLabel(panel.ToolsWindow, "Empty"), "A bench must show its empty tool slots in the Tools window beside its page.");
+        Require(panel.ToolsWindow.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The Tools window must stand left of the page.");
         string ToolState() => PopupLabel("planks", "tool_state");
         Label Lacks() => (Label)Named("craft_planks")!.FindChild("lacks", true, false);
         Require(ToolState() == "not available" && Lacks().Visible && Lacks().Text == "No chisel", "With no chisel anywhere a bench recipe must say so on its card and in its popup.");
         Give(Hosted, "stone_chisel", 1);
         await Until(() => !Lacks().Visible, "the card showing its inputs once a chisel is carried", 2);
         Require(ToolState() == "in your backpack", "A carried chisel at a bench with an empty slot must show as in the backpack.");
+        await ShowBackpack();
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Stone chisel"))));
-        await Until(() => world.BenchTool(workbench, "chisel") == "stone_chisel" && HasLabel(panel.Aside, "Stone chisel"), "Shift on the carried chisel slotting it, named in the tool window", 2);
+        await Until(() => world.BenchTool(workbench, "chisel") == "stone_chisel" && HasLabel(panel.ToolsWindow, "Stone chisel"), "Shift on the carried chisel slotting it, named in the Tools window", 2);
         Require(ToolState() == "available", "A slotted chisel must show as available.");
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
-        Require(!panel.Aside.Visible, "The tool window must close with the page.");
+        Require(!panel.ToolsWindow.Visible, "The Tools window must close with the page.");
     }
 
     /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
@@ -547,8 +549,8 @@ public partial class Game {
     /// <summary>The empty chisel slot shows Stone chisel and opens its map entry.</summary>
     private async Task CheckAltClickTheToolShownInAnEmptyToolSlot() {
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
-        await ClickOn(workbench);
-        var slot = (ItemSlot)panel.Aside.FindChild("tool_chisel", true, false);
+        await ClickOn(workbench); await UnrollTools();
+        var slot = (ItemSlot)panel.ToolsWindow.FindChild("tool_chisel", true, false);
         await Click(slot, alt: true);
         Require(recipeMap.Visible && recipeMap.Chosen == "stone_chisel" && workbench.Tools!.Count == 0,
             "Alt-clicking Stone chisel in the empty tool slot must open the Recipe map without slotting a tool.");
@@ -621,12 +623,12 @@ public partial class Game {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
         int steelHammers = Drop(Hosted, "steel_hammer");
         Give(Hosted, "steel_bar", 2); Give(Hosted, "wood_hammer", 1);
-        await ClickOn(anvil);
+        await ClickOn(anvil); await ShowBackpack();
         int mallets = world.Backpack["wood_hammer"];
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
-        var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.\nAlt-click: open the Recipe map",
+        var slot = panel.ToolsWindow.FindChild("tool_hammer", true, false) as ItemSlot;
+        Require(panel.ToolsWindow.Visible && slot != null && slot.TooltipText == "Steel hammer slot.\nAlt-click: open the Recipe map",
             $"A new anvil's empty steel hammer slot must name the tool and offer the map lookup, not \"{slot?.TooltipText}\".");
         Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
