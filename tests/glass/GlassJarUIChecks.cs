@@ -4,11 +4,14 @@ using Godot;
 using static Checks;
 using static GlassJarSteps;
 using static SetupSteps;
+using static WorldSteps;
 
 namespace ChopChopMeow;
 
 public partial class Game {
     private async Task RunGlassJarUIChecks() {
+        // Hired workers head home at dusk, which the checks before can reach on a slow machine.
+        RunUntilMorning(Hosted);
         await TestClean(CheckGlassFurnaceShowsSlotsAndStartsWithASpaceStroke);
         await TestClean(CheckBellowsControlsWalkAroundTheSelectedFurnace);
         await TestClean(CheckBothGlassBlowersAimAtTheFire);

@@ -726,8 +726,9 @@ public partial class Game {
         float healthBefore = world.Health;
         RunUntilNight(Hosted); PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .5f, Target = world.Me.Id });
         await Until(() => world.Health < healthBefore - 3 && damageEdges.Strength > 0, "a wolf bite flashing the screen edges", 2);
-        RemoveWolves(Hosted, _ => true); float bitten = world.Health;
-        await Until(() => needsPlate.Health.TooltipText == $"Health {bitten:0}%", "the HUD heart tracking health", 2);
+        // A slow frame can let the wolf bite again before it goes, so the heart is matched to the health as it stands.
+        RemoveWolves(Hosted, _ => true);
+        await Until(() => needsPlate.Health.TooltipText == $"Health {world.Health:0}%" && world.Health < healthBefore - 3, "the HUD heart tracking health", 2);
         RunUntilMorning(Hosted); SetNeeds(Hosted, health: healthBefore);
         Require(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
         SetNeeds(Hosted, 40, 70);

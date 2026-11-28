@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -20,7 +21,8 @@ public partial class Game {
         string before = world.HotbarItem(7);
         Give(Hosted, "nettle", 2); Give(Hosted, "bug_net"); SetHotbarSlot(Hosted, 7, "bug_net");
         await KeyStroke(Key.Tab);
-        await Until(() => BagCellOf("nettle").TooltipText.Contains("2 total"), "the nettles showing in the backpack", 2);
+        await Until(() => FindBagCellOf("nettle")?.TooltipText.Contains("2 total") == true && hotbar.Buttons[7].TooltipText.StartsWith("Hotbar slot 8 · Bug net", StringComparison.Ordinal),
+            "the nettles showing in the backpack and the bug net on the hotbar", 2);
         Require(BagCellOf("nettle").TooltipText.Contains("\nIt stings but my grandma used to make ropes out of it.\n"), $"a nettle's tooltip should say what the player says of it on a line of its own: {BagCellOf("nettle").TooltipText}");
         Require(hotbar.Buttons[7].TooltipText.Contains("\nI can catch all kinds of bugs with this.\n"), $"the bug net's hotbar tooltip should say what the player says of it: {hotbar.Buttons[7].TooltipText}");
         Require(!BagCellOf("steel_axe").TooltipText.Contains("\n\n") && BagCellOf("steel_axe").TooltipText.Split('\n').Length == 2, "an item with nothing said of it should keep its two tooltip lines");
