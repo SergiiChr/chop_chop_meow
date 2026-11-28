@@ -40,6 +40,10 @@ Icons and models are committed; playing does not call an image-generation servic
 - Continue until the requested goal is achieved. Ask about material design ambiguities rather than quietly changing the game.
 - Several agent sessions share the main checkout: do branch work in a worktree ([docs/RELEASE.md](docs/RELEASE.md)).
 - Keep tool downloads and build output ignored, and never depend on another local checkout.
+- Never put a worktree or any other copy of the game's sources inside a checkout, except in its `tmp/`.
+  The game compiles every C# file in its checkout outside `tmp/`, so a copy in `build/` fails every build there with
+  duplicate definitions.
+  Worktrees go in the `worktrees` folder next to the main checkout.
 - Always run Godot through `./build.py`. The binary in `.tools/` picks up the system .NET and crashes when called directly; add a `build.py` action or pass flags after `./build.py play --` instead.
 - Docs describe the game as it is now. Update them in the same change as the code; git keeps the history.
 - `./build.py play` runs the optimized release export, which leaves out Godot's debug-only warnings.
