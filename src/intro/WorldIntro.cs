@@ -20,7 +20,7 @@ public partial class WorldView {
     /// <summary>The film's frame size before it is reduced to the playback size.</summary>
     public static readonly Vector2I IntroSize = new(1280, 720);
     /// <summary>The width of the film's paint filter before the frames are reduced to their playback size.</summary>
-    public const int IntroPaintWidth = 11;
+    public const int IntroPaintWidth = 21;
     private const float IntroStep = 1f / IntroFps;
     /// <summary>The cue sheet beside the frames: when each sound starts, how loud, and how it is treated.</summary>
     public const string IntroCues = "cues.tsv";

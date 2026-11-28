@@ -123,15 +123,15 @@ onto the wet pavement and turns right into a side passage.
 He takes the train out to the forest and picks berries along a leaf-strewn trail.
 He eats them as he walks down to the shore, then touches the sea.
 On his first night by the fire, the silhouettes and eyes of approaching wolves appear beyond the firelight.
-The film keeps the game's painted look, with sharper faces and textures in close-up.
+The film keeps the game's painted look with a soft, lightly blocky 1990s pre-rendered finish.
 
 The game draws the film itself, so a change to a model or a shot means making the movie again:
 
 1. `./tools/intro_film.py` draws the frames, 30 a second, and writes the cue sheet of the film's sounds beside them.
-   The paint filter is 11 pixels wide on those frames, close to the game's 8 after the movie tool shrinks them.
+   The paint filter is 21 pixels wide on those frames so the strokes still read when the movie tool shrinks them.
 2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`.
-   It keeps all 30 frames a second at 960×540, mixes the cue sheet's sounds from `assets/sounds` and `assets`, and
-   writes Ogg Theora, which the game scales to the window.
+   It keeps every second frame for 15 frames a second, shrinks the picture to 480×270, and adds light JPEG blocks.
+   It mixes sounds from `assets/sounds` and `assets` and writes Ogg Theora, which the game scales to the window.
    The movie tool is not part of this project; the `intro-film` skill (`.agents/skills/intro-film`) has the commands.
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.

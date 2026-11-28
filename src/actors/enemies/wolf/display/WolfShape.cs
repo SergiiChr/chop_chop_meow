@@ -61,11 +61,11 @@ internal static class WolfShape {
         Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596"), Gum = new("8f4a4c"), Tongue = new("b8585c"), Tooth = new("efe9d9");
     public static readonly StandardMaterial3D Fur = ModelKit.Vertex(Surface.Flat, .95f);
     private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = 1.2f };
-    private static ArrayMesh? fur, eyes;
+    private static ArrayMesh? fur, eyes, filmEyes;
     private static Skin? skin;
 
     /// <summary>A new skeleton in its resting pose under <paramref name="parent"/>, wearing the shared fur and eyes.</summary>
-    public static Skeleton3D Build(Node3D parent, StandardMaterial3D? eyeShine = null) {
+    public static Skeleton3D Build(Node3D parent, StandardMaterial3D? filmEyeShine = null) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         for (int i = 0; i < Bones.Length; i++) {
@@ -77,9 +77,10 @@ internal static class WolfShape {
         skeleton.ResetBonePoses();
         skin ??= BuildSkin();
         fur ??= BuildFur();
-        eyes ??= BuildEyes();
+        // The film's eyes need a little more area to survive the small frame and its compression.
+        var eyeMesh = filmEyeShine is null ? (eyes ??= BuildEyes(1)) : (filmEyes ??= BuildEyes(2.25f));
         skeleton.AddChild(new MeshInstance3D { Mesh = fur, MaterialOverride = Fur, Skin = skin, Skeleton = new NodePath("..") });
-        skeleton.AddChild(new MeshInstance3D { Mesh = eyes, MaterialOverride = eyeShine ?? EyeShine, Skin = skin, Skeleton = new NodePath(".."), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        skeleton.AddChild(new MeshInstance3D { Mesh = eyeMesh, MaterialOverride = filmEyeShine ?? EyeShine, Skin = skin, Skeleton = new NodePath(".."), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         return skeleton;
     }
 
@@ -379,12 +380,15 @@ internal static class WolfShape {
     private static Vector3 Eye(int side) => new(side * .074f, .898f, .634f);
     private static Vector3 EyeFaces(int side) => new Vector3(side * .8f, .15f, 1).Normalized();
 
-    private static ArrayMesh BuildEyes() {
+    private static ArrayMesh BuildEyes(float size) {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         int start = 0;
         foreach (int side in new[] { 1, -1 }) {
-            var at = Eye(side); var faces = EyeFaces(side);
-            Tube(s, ref start, new[] { new Ring(at - faces * .006f, .006f, .006f, Head), new Ring(at, .015f, .01f, Head), new Ring(at + faces * .006f, .006f, .005f, Head) },
+            var faces = EyeFaces(side);
+            float depth = .006f * size;
+            var at = Eye(side) + faces * (depth - .006f);
+            Tube(s, ref start, new[] { new Ring(at - faces * depth, depth, depth, Head),
+                new Ring(at, .015f * size, .01f * size, Head), new Ring(at + faces * depth, depth, .005f * size, Head) },
                 Vector3.Up.Cross(faces).Normalized(), Vector3.Up, 8, (_, _, _) => Colors.White);
         }
         return s.Commit();

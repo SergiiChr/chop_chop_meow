@@ -36,7 +36,7 @@ this project turns them into the movie.
    ```sh
    T=~/projects/agents/skills
    $T/retro-movie/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv \
-       --movie-size 960x540 --movie-fps 30 --quality 3 \
+       --movie-size 480x270 --movie-fps 15 --quality 4 \
        --sounds assets/sounds --sounds assets --gain 5 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
    ```
 

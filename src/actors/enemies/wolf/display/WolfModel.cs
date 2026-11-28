@@ -113,8 +113,8 @@ public sealed class WolfModel {
     /// <summary>Position in the stride, and ground speed smoothed over a few frames.</summary>
     private float cycle, speed;
 
-    public WolfModel(StandardMaterial3D? eyeShine = null) {
-        skeleton = WolfShape.Build(Root, eyeShine);
+    public WolfModel(StandardMaterial3D? filmEyeShine = null) {
+        skeleton = WolfShape.Build(Root, filmEyeShine);
         shown = Standing(0, false);
         Apply(shown);
     }

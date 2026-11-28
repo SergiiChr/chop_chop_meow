@@ -1958,8 +1958,9 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   Each thigh tips out on its own through `Pose.SplayL` and `Pose.SplayR`.
   `Catgirl` adds wrists that bend, twist and tip, a head that nods, turns and tilts, and a turn of the whole body.
   A `DanceFrame` also holds where the dancer stands, so the soloist can move her weight over a planted leg.
-- The paint filter is drawn slightly wider over the source frames (`WorldView.IntroPaintWidth`) so it keeps the game's
-  look at playback size.
+- The paint filter is drawn wider over the source frames (`WorldView.IntroPaintWidth`) so the strokes still read
+  after the movie is shrunk to 480×270.
+  The movie keeps 15 frames a second and adds light JPEG blocks for its pre-rendered look.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
   sky,
   since the game's sky is one flat colour that only a view from above hides.
