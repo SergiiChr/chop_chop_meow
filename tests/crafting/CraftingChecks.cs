@@ -10,7 +10,7 @@ using static PlayerSteps;
 using static WorkerSteps;
 using static EconomySteps;
 
-/// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, and the workers who craft or pump a station.</summary>
+/// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, the workers who craft or pump a station, and the stations the recipe map shows.</summary>
 public static class CraftingChecks {
     public static void Run(GameData data) {
         Test(CheckMarkFollowsTheRecipeAskedFor, data);
@@ -38,6 +38,9 @@ public static class CraftingChecks {
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
+        Test(CheckEveryBuildingAndHandRecipeShowsOnTheRecipeMapFromTheStart, data);
+        Test(CheckABuiltStationShowsWhatItMakesOnTheRecipeMap, data);
+        Test(CheckHeldItemsAndSeenResourcesShowOnTheRecipeMap, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchWorksWithACarriedOrSlottedToolWhicheverIsFaster, data);
         Test(CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf, data);
@@ -940,5 +943,60 @@ public static class CraftingChecks {
         foreach (var w in world.Workers.ToList()) world.Fire(w);
         SafeTick(world, 5);
         Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
+    }
+
+    /// <summary>
+    /// A new settlement sees on the map every building the build menu lists and everything the crafting menu makes by
+    /// hand, each with what it is made of followed down to ingredients, fuels and tools.
+    /// </summary>
+    private static void CheckEveryBuildingAndHandRecipeShowsOnTheRecipeMapFromTheStart(GameData data) {
+        var world = EmptyWorld(data);
+        foreach (string building in new[] { "bench", "furnace", "reinforced", "anvil", "cooktable", "cannery", "pump", "steel_piping" })
+            Require(world.MapDiscovery.Of(building) == MapState.NotMade, $"the {building} should show on the map before anyone builds it");
+        Require(world.MapDiscovery.Of("steel_pipe") == MapState.NotMade, "the steel pipe that steel piping costs should show on the map");
+        Require(world.MapDiscovery.Of("iron_ore") == MapState.NotMade, "the iron ore that steel bars are made from should show on the map");
+        Require(world.MapDiscovery.Of("charcoal") == MapState.NotMade, "charcoal, a fuel for smelting iron, should show on the map");
+        Require(world.MapDiscovery.Of("torch") == MapState.NotMade, "a torch, which is made by hand, should show on the map");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.Undiscovered, "canned jam, made only at a canning station nobody built, should stay undiscovered");
+        Achieve(world, "furnace");
+        Require(world.MapDiscovery.Of("furnace") == MapState.Made, "a building once built should show as built");
+    }
+
+    /// <summary>A built station shows on the map everything it makes, with what that is made of.</summary>
+    private static void CheckABuiltStationShowsWhatItMakesOnTheRecipeMap(GameData data) {
+        var world = EmptyWorld(data);
+        string[] benchWork = ["steel_shovel", "rake", "lantern", "bug_net", "nettle_rope"];
+        foreach (string item in benchWork)
+            Require(world.MapDiscovery.Of(item) == MapState.Undiscovered, $"the {item} should stay undiscovered before a crafting bench is built");
+        Achieve(world, "bench");
+        foreach (string item in benchWork)
+            Require(world.MapDiscovery.Of(item) == MapState.NotMade, $"a built crafting bench should show the {item} it makes on the map");
+        Require(world.MapDiscovery.Of("nettle") == MapState.NotMade, "the nettle that rope is twisted from should show with it");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.Undiscovered, "a built crafting bench should leave canned jam undiscovered");
+        Achieve(world, "cannery");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.NotMade, "a built canning station should show the canned jam it makes");
+    }
+
+    /// <summary>What a player holds shows on the map, and the resources the settlement has seen show once the map opens.</summary>
+    private static void CheckHeldItemsAndSeenResourcesShowOnTheRecipeMap(GameData data) {
+        var world = EmptyWorld(data);
+        Require(world.MapDiscovery.Of("canned_meat_stew") == MapState.Undiscovered, "canned stew nobody holds should stay undiscovered");
+        Give(world, "canned_meat_stew", 1);
+        Require(world.MapDiscovery.Of("canned_meat_stew") == MapState.NotMade, "canned stew in the player's backpack should show on the map");
+
+        string[] resources = ["nettle", Firebugs.Item, Beach.Sand];
+        foreach (string item in resources)
+            Require(world.MapDiscovery.Of(item) == MapState.Undiscovered, $"{item} nobody has seen should stay undiscovered");
+        world.Add(ThingKind.Nettle, world.Player + Vector2.Right * 2, 1);
+        world.Add(ThingKind.Firebug, world.Player + Vector2.Left * 2, 1);
+        world.Look();
+        Require(world.MapDiscovery.Of("nettle") == MapState.Undiscovered, "a nettle seen while the map is open should wait for the map to open again");
+        world.MapDiscovery.ReadSeen();
+        Require(world.MapDiscovery.Of("nettle") == MapState.NotMade, "a nettle the player has seen should show on the map");
+        Require(world.MapDiscovery.Of(Firebugs.Item) == MapState.NotMade, "a firebug in the player's sight should show on the map");
+        world.Player = Enumerable.Range(0, Terrain.Size * Terrain.Size).Select(i => new Vector2(i % Terrain.Size, i / Terrain.Size)).First(Beach.IsSand);
+        world.Look();
+        world.MapDiscovery.ReadSeen();
+        Require(world.MapDiscovery.Of(Beach.Sand) == MapState.NotMade, "beach sand the player has seen should show on the map");
     }
 }

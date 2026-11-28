@@ -14,6 +14,7 @@ public static class GoalChecks {
         Test(CheckSteelToolsGoalWaitsForBothAHammerAndAPickaxe, data);
         Test(CheckGoalsUnlockAndCompleteIndependently, data);
         Test(CheckSettlementRemembersWhatItHasHad, data);
+        Test(CheckAGoalInTheLogShowsWhatItNamesAndEverythingNeededToMakeIt, data);
     }
 
     /// <summary>
@@ -104,5 +105,13 @@ public static class GoalChecks {
         world.Player = loose.Pos; world.Gather(loose, Step);
         var loaded = new World(data, false); loaded.Deserialize(save);
         Require(world.Had("coal") && loaded.Had("tin_ore") && !loaded.Had("coal"), "a save should keep what the settlement had when it was written");
+    }
+
+    /// <summary>A goal that appears in the Goal Log shows its buildings and items on the map, with what they are made of and the tools they take.</summary>
+    private static void CheckAGoalInTheLogShowsWhatItNamesAndEverythingNeededToMakeIt(GameData data) {
+        var world = EmptyWorld(data);
+        Require(world.MapDiscovery.Of("steel_pick") == MapState.Undiscovered, "a steel pickaxe should stay undiscovered while no goal in the log names it");
+        Achieve(world, Goals.OreSeen);
+        Require(world.MapDiscovery.Of("steel_pick") == MapState.NotMade, "Steel tools appearing should show the steel pickaxe it names");
     }
 }

@@ -124,16 +124,23 @@ public partial class Game {
     /// <summary>Double clicks a window point in the world, as <see cref="DoubleClick(Control)"/> does a control.</summary>
     private async Task DoubleClick(Vector2 point) => await DoublePress(GetViewport().GetFinalTransform() * point);
 
-    /// <summary>Two presses and releases at a window point, the second press flagged as a double click, each waiting out the frames after it.</summary>
+    /// <summary>
+    /// Two presses and releases at a window point, the second press flagged as a double click.
+    /// Like a player's quick presses, each comes on the frame after the last without waiting for the server, so slow frames cannot push the
+    /// second press past the double click's time; the frames after the last release wait for it.
+    /// </summary>
     private async Task DoublePress(Vector2 at) {
         foreach (bool second in new[] { false, true }) {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
-            await Frames();
+            await NextFrame();
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-            await Frames();
+            await NextFrame();
         }
-        await Frames();
+        await Frames(3);
     }
+
+    /// <summary>Waits for the next frame, which takes the input sent before it, without waiting for the server.</summary>
+    private async Task NextFrame() => await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
     /// <summary>Picks up a cell's stack with a left click, which on a cell with a use waits out a possible second press first.</summary>
     private async Task PickUp(Control cell) {

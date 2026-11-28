@@ -111,9 +111,10 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         face.AddChild(name);
         card.PresentIdentity = (caption, texture) => {
             icon.Texture = texture;
-            icon.Visible = card.Known;
+            icon.Visible = card.Shown;
+            icon.SelfModulate = card.Tint;
             name.Text = caption;
-            name.HorizontalAlignment = card.Known ? HorizontalAlignment.Left : HorizontalAlignment.Center;
+            name.HorizontalAlignment = card.Shown ? HorizontalAlignment.Left : HorizontalAlignment.Center;
         };
         return card;
     }

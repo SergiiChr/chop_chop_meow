@@ -46,7 +46,6 @@ internal static class ItemTreeActions {
             GatherAction.ChopTrees => "Chop trees",
             GatherAction.MineOres => "Mine ores",
             GatherAction.RakeLeaves => "Rake leaves",
-            GatherAction.GatherNettles => "Gather nettles without stings",
             GatherAction.CatchFirebugs => "Catch firebugs",
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
         };

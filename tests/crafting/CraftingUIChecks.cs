@@ -308,8 +308,9 @@ public partial class Game {
         await ClickOn(furnace);
         await DoubleClick(Named("craft_tin_bar")!);
         await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
+        int shakes = ProcessRow.ShakesBegun;
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
-        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
+        Require(ProcessRow.ShakesBegun > shakes, "Queueing another recipe while a batch is worked must shake the boxes.");
         await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
@@ -334,13 +335,15 @@ public partial class Game {
         // Stone in every free slot leaves no room for the furnace's wood.
         int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         await ClickOn(furnace);
+        int shakes = ProcessRow.ShakesBegun;
         await DoubleClick(Named("craft_iron_bar")!);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the slots.");
+        Require(ProcessRow.ShakesBegun > shakes, "A double-click refused for a full backpack must shake the slots.");
         Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
             "A furnace whose slots the backpack has no room for must stay on its recipe with its wood and its mark.");
         await Until(() => !WorkRow().Shaking, "the slots coming to rest", 2);
+        shakes = ProcessRow.ShakesBegun;
         await Click(Named("craft_iron_bar")!);
-        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
+        await Until(() => ProcessRow.ShakesBegun > shakes, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
         Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
     }
@@ -454,8 +457,9 @@ public partial class Game {
         Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
         Require(recipeMap.FindChild("map_stations", true, false) == null, "The map must open without the station-cost row.");
         Require(world.Data.Items.Keys.Where(id => world.Data.MapEntryOf(id) == id).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
-        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as undiscovered.");
-        Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources"), "The map must label the marks for tools and resources.");
+        Require(recipeMap.NodeOf("steel_axe")!.State == MapState.Made && recipeMap.NodeOf("canned_jam")!.State == MapState.Undiscovered, "The axe the settlement started with must be drawn as known, and jam nobody has canned as undiscovered.");
+        Require(HasLabel(recipeMap, "Made before") && HasLabel(recipeMap, "Not made yet") && HasLabel(recipeMap, "Undiscovered") &&
+            HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources"), "The map must label the looks of its cards and the marks for tools and resources.");
         await KeyStroke(Key.Escape);
         Require(!recipeMap.Visible && !panel.Visible && !bag.Visible, "Escape must close the map and return to the world.");
     }
@@ -577,19 +581,30 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
-    /// <summary>The game goes on under the open recipe map: time passes and an item first made meanwhile turns to made before, while a held walking key leaves the player in place.</summary>
+    /// <summary>
+    /// The game goes on under the open recipe map: time passes, an undiscovered item or a building not built yet that is
+    /// first made or built meanwhile says so, and a held walking key leaves the player in place.
+    /// </summary>
     private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
         await CloseWithEsc();
         await KeyStroke(Key.C);
         await Click((Button)hotbar.FindChild("map", true, false));
         var stew = recipeMap.NodeOf("canned_meat_stew")!;
-        Require(!stew.Known, "Canned stew nobody has made must be drawn as undiscovered.");
+        Require(stew.State == MapState.Undiscovered, "Canned stew nobody has made must be drawn as undiscovered.");
         float opened = world.Time;
         await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
         await Click((Control)stew.FindChild("slot", true, false));
         Achieve(Hosted, "canned_meat_stew");
-        await Until(() => stew.Known, "the selected stew turning to made before on the open map", 2);
-        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
+        await Until(() => stew.State == MapState.Made, "the selected stew turning to made before on the open map", 2);
+        var details = (Node)recipeMap.FindChild("map_details", true, false);
+        Require(HasLabel(details, "Made before"), "The stew's details must say it was made before.");
+        var furnace = recipeMap.NodeOf("reinforced")!;
+        Require(furnace.State == MapState.NotMade, "A reinforced furnace nobody has built must be drawn as not built yet.");
+        await Click((Control)furnace.FindChild("slot", true, false));
+        Require(HasLabel(details, "Not built yet"), "The reinforced furnace's details must say it is not built yet.");
+        Achieve(Hosted, "reinforced");
+        await Until(() => furnace.State == MapState.Made && HasLabel(details, "Built before"),
+            "the selected reinforced furnace turning from not built yet to built before on the open map", 2);
         var stood = world.Player;
         await Holding(Key.D, () => Seconds(.3));
         Require(world.Player.DistanceTo(stood) < .01f, "A walking key held under the map must not move the player.");

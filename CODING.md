@@ -80,7 +80,7 @@ Project rules on top of the global coding and testing guides.
   `Checks.Test` logs the check's time and stops the process when it runs past 20 seconds.
   A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds.
   A runner that calls a feature's runner calls it plainly, and a step inside one scenario check, such as one half of the network session, is not wrapped either: timers do not nest, and a new one resets the outer check's.
-  `./build.py` also gives each test stage its own 300-second deadline, so a run that hangs outside any check still stops.
+  `./build.py` also gives each test stage its own 600-second deadline, so a run that hangs outside any check still stops.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 

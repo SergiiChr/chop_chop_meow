@@ -120,7 +120,11 @@ public partial class Game : Node, IGameFlow {
             // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
             if (!review && screenshotPath == null) PlayIntro();
             if (Launch.Has("--performance-run")) StartGame(-1);
-            if (Launch.Has("--ui-test")) RunUIChecks();
+            if (Launch.Has("--ui-test")) {
+                // Headless Godot sleeps each frame it cannot draw; the UI checks count frames, so they run without that pause.
+                OS.LowProcessorUsageModeSleepUsec = 0;
+                RunUIChecks();
+            }
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
             if (Launch.Has("--server-check")) RunServerCheck();
             if (introFolder != null) {

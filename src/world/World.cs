@@ -425,6 +425,7 @@ public sealed partial class World {
         hauling = new Hauling(this, barrelHaul); takeBack = new TakeBack(this); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         isStation = Array.ConvertAll(Kinds.All, kind => Array.IndexOf(stationKinds, kind) >= 0);
+        MapDiscovery = new MapDiscovery(this);
         if (generate) NewGame();
     }
     /// <summary>The kinds of station some recipe is made at.</summary>
@@ -450,6 +451,11 @@ public sealed partial class World {
     /// </summary>
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
+    /// <summary>
+    /// Which recipe map entries the settlement has made, the player can see but nobody has made, or are still to
+    /// discover.
+    /// </summary>
+    public MapDiscovery MapDiscovery { get; }
     /// <summary>What idle workers play when they sit together at a campfire.</summary>
     public CampfireMusic CampfireMusic { get; } = new();
     private readonly Barrels barrels;

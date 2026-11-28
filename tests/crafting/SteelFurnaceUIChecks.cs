@@ -25,10 +25,12 @@ public partial class Game {
         await ShowBackpack();
         await Carry(BagCell(c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
         await Until(() => furnace.Inventory["iron_bar"] == 5 && world.Backpack["iron_bar"] == 0 && cursor.Empty, "held bars put on the matching input slot loading", 2);
-        await Carry(BagCell(c => c.TooltipText.StartsWith("Coal")), Named("input_iron_bar")!);
+        var ironSlot = (ItemSlot)Named("input_iron_bar")!;
+        int shakes = ironSlot.Shakes;
+        await Carry(BagCell(c => c.TooltipText.StartsWith("Coal")), ironSlot);
         await Frames(4);
         Require(furnace.Inventory["coal"] == 0 && !cursor.Empty, "An input slot must refuse a different item and leave it held.");
-        Require(((ItemSlot)Named("input_iron_bar")!).Shaking, "An input slot that refuses a held stack must shake.");
+        Require(ironSlot.Shakes > shakes, "An input slot that refuses a held stack must shake.");
         await RightClick(Named("input_coal")!);
         await Until(() => furnace.Inventory["coal"] == 1, "a right click with coal held putting one in its input slot", 2);
         await KeyStroke(Key.Escape);

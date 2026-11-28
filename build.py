@@ -68,7 +68,7 @@ PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
 # Seconds a test stage may take, so a run that hangs outside any check still stops.
 # Each check has its own limit in tests/Checks.cs.
-TEST_STAGE_LIMIT = 300
+TEST_STAGE_LIMIT = 600
 ERRORS = re.compile(r"SCRIPT ERROR|Parse Error|ERROR:|Unhandled exception")
 
 

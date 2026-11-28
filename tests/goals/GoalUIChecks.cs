@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -43,6 +44,18 @@ public partial class Game {
             "The selected item should be scrolled into view.");
         await KeyStroke(Key.Escape);
         Require(!recipeMap.Visible && menu.GoalDetails.Visible && view.Paused, "Closing the map should return to the paused goal details.");
+        await KeyStroke(Key.Escape);
+
+        await Click(FindButton(menu, "Stone and embers")!);
+        var furnace = menu.GoalDetails.FindChild("goal_item_furnace", true, false) as Button;
+        Require(furnace is { Icon: not null, TooltipText: "Stone furnace" }, "Stone and embers should show the stone furnace as a hoverable icon.");
+        await Click(furnace!);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "furnace" && recipeMap.NodeOf("furnace")!.Lit,
+            "the building icon opening the map with the stone furnace highlighted", 2);
+        var details = (Node)recipeMap.FindChild("map_details", true, false);
+        Require(recipeMap.NodeOf("furnace")!.State == MapState.NotMade && HasLabel(details, "Stone furnace") && HasLabel(details, "Not built yet"),
+            "A stone furnace that a goal names and nobody has built should show its name and say it is not built yet.");
+        await KeyStroke(Key.Escape);
         await KeyStroke(Key.Escape);
         await KeyStroke(Key.Escape);
     }
@@ -123,6 +136,9 @@ public partial class Game {
         Require(menu.GoalDetails.Visible && HasLabel(menu.GoalDetails, "Build an iron mine.") &&
             HasLabel(menu.GoalDetails, "Build a coal mine.") && HasLabel(menu.GoalDetails, "Build a tin mine."),
             "Infinite power must open its details with all three mines.");
+        var icons = menu.GoalDetails.FindChild("goal_item_mine", true, false)?.GetParent().GetChildren().Select(icon => icon.Name.ToString());
+        Require(icons != null && icons.SequenceEqual(["goal_item_mine", "goal_item_iron_ore", "goal_item_coal", "goal_item_tin_ore"]),
+            $"Infinite power must show the mine, then iron ore, coal and tin ore, but shows {string.Join(", ", icons ?? [])}.");
         var ironMark = (Label)menu.GoalDetails.FindChild("goal_mine_iron", true, false);
         var coalMark = (Label)menu.GoalDetails.FindChild("goal_mine_coal", true, false);
         Require(ironMark.Text == "○", "An unopened iron mine must be unchecked.");

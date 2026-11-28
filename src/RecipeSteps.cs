@@ -52,7 +52,21 @@ public partial class Game {
     private void GiveFuel(RecipeDef r) => Give(Hosted, FuelFor(r));
 
     /// <summary>The backpack cell that holds an item, found by the name its tooltip starts with.</summary>
-    private ItemSlot BagCellOf(string item) => BagCell(c => c.TooltipText.StartsWith(world.Describe(item, world.Backpack.Inventory) + " ·", StringComparison.Ordinal));
+    private ItemSlot BagCellOf(string item) => FindBagCellOf(item) ?? throw new InvalidOperationException($"The backpack shows no {item}.");
+
+    /// <summary>
+    /// Waits for the backpack to show an item and gives its cell: the page draws what the server gave on its next refresh,
+    /// which a slow frame can put off past the frames after the gift.
+    /// </summary>
+    private async Task<ItemSlot> ShownBagCellOf(string item) {
+        ItemSlot? cell = null;
+        await Until(() => (cell = FindBagCellOf(item)) != null, $"the backpack showing {item}", 2);
+        return cell!;
+    }
+
+    private ItemSlot? FindBagCellOf(string item) =>
+        bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>()
+            .FirstOrDefault(c => c.TooltipText.StartsWith(world.Describe(item, world.Backpack.Inventory) + " ·", StringComparison.Ordinal));
 
     /// <summary>Waits for a station to begin a batch of the recipe: everything it takes was in it, so the next tick started it.</summary>
     private async Task ExpectStarts(Thing station, string recipe, string how) =>
@@ -75,9 +89,9 @@ public partial class Game {
     /// and several ticks later it has begun no batch.
     /// </summary>
     private async Task ExpectRefusedDoubleClick(Thing station, string id, string how, params string[] missing) {
-        int posted = messages.Posted;
+        int posted = messages.Posted, shakes = ProcessRow.ShakesBegun;
         await DoubleClick(Named($"craft_{id}")!);
-        Require(WorkRow().Shaking, $"A double-click on {id} {how} must shake the slots.");
+        Require(ProcessRow.ShakesBegun > shakes, $"A double-click on {id} {how} must shake the slots.");
         await Until(() => messages.Posted > posted && messages.Last.StartsWith("Missing ", StringComparison.Ordinal) && missing.All(messages.Last.Contains),
             $"a message that {id} is missing {string.Join(", ", missing)} {how}", 2);
         await Frames(12);
@@ -95,14 +109,14 @@ public partial class Game {
             await Until(() => station.Recipe == id && Named($"input_{r.Inputs.Keys.First()}") != null, $"a click on {id} turning the station to it", 2);
         }
         if (r.Burns) {
-            GiveFuel(r); await Frames(2);
-            await Carry(BagCellOf(FuelFor(r)), Named("fuel")!);
+            GiveFuel(r);
+            await Carry(await ShownBagCellOf(FuelFor(r)), Named("fuel")!);
             await Until(() => station.Burner![FuelFor(r)] == 1 && cursor.Empty, $"{FuelFor(r)} put on the fuel slot of {id}", 2);
         }
         foreach (var (item, amount) in r.Inputs) {
-            GiveInput(item, amount); await Frames(2);
+            GiveInput(item, amount); await Frames(1);
             string carried = world.Data.VesselFor(item) is VesselDef v ? Vessels.First(world.Backpack, v.Empty, v.Liquid, Math.Min(amount, v.Capacity))! : item;
-            await Carry(BagCellOf(carried), Named($"input_{item}")!);
+            await Carry(await ShownBagCellOf(carried), Named($"input_{item}")!);
             await Until(() => cursor.Empty, $"{carried} put on the input slot of {id}", 2);
         }
     }

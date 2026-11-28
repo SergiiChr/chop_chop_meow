@@ -638,8 +638,9 @@ Those spots stay clear of other buildings.
 
 Press Esc to open the Goal Log.
 Click a goal name for its details, or expand **Completed** to revisit finished goals.
-Hover over an item icon to see its name.
-Click it to open the recipe map with that item highlighted.
+A goal's details show an icon for each building and item it names, buildings first.
+Hover over an icon to see its name.
+Click it to open the recipe map with that building or item highlighted.
 Close the map to return to the goal.
 
 You can start on the campfire, cabin, crafting bench, stone furnace, hiring and profit goals right away.
@@ -727,6 +728,10 @@ An item discovered while the map is open reveals its name and icon without reope
   **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
   Discovered cards name where the item is made or found. Marking a mine site reveals its plan.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
+  Anything you can see elsewhere in the game shows too: every building in the build menu, everything made by hand,
+  what a built station makes, what you hold, what a goal in the Goal Log names, and the resources you have seen.
+  Everything needed to make those shows with them: build costs, ingredients, fuels and tools, all the way down.
+  Until someone makes or builds one, its picture is greyed and its details say **Not made yet** or **Not built yet**.
   Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel
   shows the same dashed question-mark badge. Their details and Item trees stay hidden until discovery.
 - Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
@@ -736,8 +741,8 @@ An item discovered while the map is open reveals its name and icon without reope
   menu for a recipe made by hand.
 - Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
   **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
-  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes and
-  beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
+  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes,
+  nettles and beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
   The pickaxe and hammers share **Building a mine** for preparing it.
   All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
   Water shows **Drink**, **Water farm plots** and **Water saplings**. Berry jam shows **Food**.
