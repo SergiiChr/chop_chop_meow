@@ -16,17 +16,20 @@ public partial class FoodEffectBadge : PanelContainer {
         detail = FoodEffects.Describe(effect);
         TooltipText = detail.Name;
         MouseFilter = MouseFilterEnum.Stop;
-        AddThemeStyleboxOverride("panel", Style.KeyPill);
-        AddChild(effect switch {
-            FoodEffect.CarbLoad => Style.Glyph("line_flame", 18, Style.Brick),
-            FoodEffect.ProteinRecovery => NeedIcon(NeedGauge.Heart, Style.Brick),
-            FoodEffect.WellFed => NeedIcon(NeedGauge.Stomach, Style.Mustard),
-            _ => Style.Glyph("line_leaf", 18, Style.Sage)
-        });
+        CustomMinimumSize = new Vector2(48, 48);
+        SizeFlagsVertical = SizeFlags.ShrinkCenter;
+        (string Glyph, Color Fill, Color Rim) look = effect switch {
+            FoodEffect.CarbLoad => ("line_carb_load", new("502b21"), new("ffb48a")),
+            FoodEffect.ProteinRecovery => ("line_protein_recovery", new("52263a"), new("ffafcc")),
+            FoodEffect.WellFed => ("line_well_fed", new("4d381d"), new("ffdc83")),
+            FoodEffect.Vitamins => ("line_vitamins", new("293e30"), new("b5e2b2")),
+            _ => throw new ArgumentOutOfRangeException(nameof(effect))
+        };
+        AddThemeStyleboxOverride("panel", Style.Flat(look.Fill, 24, 0, look.Rim, 2));
+        var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
+        AddChild(center);
+        center.AddChild(Style.Glyph(look.Glyph, 24, look.Rim));
     }
-
-    private static NeedGauge NeedIcon(Vector2[] shape, Color fill) =>
-        new() { Shape = shape, Fill = fill, CustomMinimumSize = new Vector2(18, 18), MouseFilter = MouseFilterEnum.Ignore };
 
     public override GodotObject _MakeCustomTooltip(string forText) => new Countdown(world, Effect, detail);
 

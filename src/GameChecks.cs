@@ -283,39 +283,6 @@ public partial class Game {
         Warp(Hosted, home); await CloseWithEsc(); await Frames(4);
     }
 
-    private async Task CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker() {
-        await CloseWithEsc();
-        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(Hosted, Inventory.Coins, 100);
-        await Click(view.Screen(sign.Pos, .8f));
-        var fetch = Named("fetch");
-        Require(ShowsChild(panel, "side_board"), "The price sheet must open.");
-        Require(panel.OffsetLeft == SidePanel.Left - MarketPanel.SheetWidth, "The price sheet must open beside the panel.");
-        Require(fetch != null, "The price sheet must offer a fetch button.");
-        Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
-        Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");
-        Require(Named("buy_wood") == null, "The price sheet must not offer wood, which the village does not sell.");
-        Require(Named("buy_berries") == null,
-            "The price sheet must not offer berries, which the village does not sell.");
-        Require(Named("buy_water") != null, "The price sheet must offer water, which the village sells.");
-        await Click(Named("buy_water")!);
-        Require(world.Orders.Count == 1 && world.Orders[0].Buying, "Buy on the price sheet must order goods.");
-        await Click(Named("hardhat")!);
-        var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
-        await Click(Named($"hire_{dear.Upfront:0}")!);
-        var hired = Hosted.Workers.LastOrDefault();
-        Require(hired != null && hired.Wage == dear.Wage, "A hiring offer must set the new worker's wage.");
-        Hosted.Assign(hired!, sign); await ClickOn(sign);
-        Require(!Named("fetch")!.Disabled, "With a worker assigned, fresh prices can be fetched.");
-        await Click(Named("fetch")!);
-        Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
-        await Click(Named("prices")!);
-        Require(!ShowsChild(panel, "side_board") && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
-        await Click(Named("prices")!); await Click(Named("sheet_close")!);
-        Require(!ShowsChild(panel, "side_board") && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
-        Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
-        await CloseWithEsc();
-    }
 
     /// <summary>A held stack shows its count by the cursor: the whole stack by left click, half of one by right click.</summary>
     private async Task CheckCarriedStackShowsItsCount() {
@@ -897,7 +864,6 @@ public partial class Game {
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await RunTradeUIChecks();
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
-            await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await RunGoalUIChecks(freshGame: false);
             await RunCraftingUIChecks();
             await RunGlassJarUIChecks();

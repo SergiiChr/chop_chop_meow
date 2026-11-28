@@ -117,7 +117,7 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
         Summary(row, duty, at, spot.InGroup, group?.Hauls.Count ?? 0);
         Button drop;
         if (group != null) drop = kit.HeaderButton("close", "Take this group apart · its hauls stay as jobs of their own", () => world.RemoveHaulGroup(w, group.Id), Style.Round(Style.Tan, 18), $"ungroup_{group.Id}");
-        else drop = kit.HeaderButton("close", "Take this job away", () => world.SetDuty(w, at!, duty!.Job, false), Style.CloseRound, $"drop_{duty!.Job.Id()}_{at!.Id}");
+        else drop = kit.HeaderButton("minus", "Take this job away", () => world.SetDuty(w, at!, duty!.Job, false), Style.CloseRound, $"drop_{duty!.Job.Id()}_{at!.Id}");
         drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14);
         row.AddChild(drop);
         return row;

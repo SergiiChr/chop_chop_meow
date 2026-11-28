@@ -9,9 +9,11 @@ public partial class NeedGauge : Control {
     // Outlines in units of the gauge height; x is centred afterwards.
     public static readonly Vector2[] Stomach =
     {
-        new(.5f, 0), new(.68f, 0), new(.68f, .14f), new(.82f, .18f), new(.94f, .3f), new(1, .46f), new(.98f, .63f), new(.9f, .78f), new(.76f, .9f),
-        new(.58f, .97f), new(.4f, .98f), new(.25f, .94f), new(.14f, .86f), new(.06f, .8f), new(0, .72f), new(.07f, .64f), new(.16f, .7f),
-        new(.26f, .74f), new(.36f, .72f), new(.44f, .62f), new(.5f, .48f), new(.5f, .3f)
+        new(.49f, .05f), new(.54f, .025f), new(.64f, .025f), new(.68f, .06f), new(.69f, .16f), new(.73f, .21f),
+        new(.83f, .24f), new(.91f, .31f), new(.96f, .41f), new(.97f, .53f), new(.94f, .65f), new(.88f, .76f),
+        new(.79f, .85f), new(.68f, .91f), new(.55f, .945f), new(.42f, .95f), new(.3f, .925f), new(.2f, .88f),
+        new(.11f, .82f), new(.045f, .74f), new(.04f, .69f), new(.1f, .64f), new(.15f, .66f), new(.23f, .71f),
+        new(.32f, .725f), new(.39f, .69f), new(.44f, .62f), new(.47f, .52f), new(.48f, .4f), new(.48f, .24f)
     };
     public static readonly Vector2[] Droplet = Enumerable.Range(0, 25)
         .Select(i => Mathf.DegToRad(63 + i * 234 / 24f)).Select(a => new Vector2(.34f + .3f * MathF.Sin(a), .66f - .3f * MathF.Cos(a)))

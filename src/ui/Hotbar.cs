@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The tool belt along the bottom: round badges for the menus, then nine slots of saved item and plan references.
+/// The tool belt along the bottom: illustrated menu badges, then nine slots of saved item and plan references.
 /// A click selects a slot, which puts its item in the player's hand; plans and crates go straight to placement.
 /// </summary>
 public partial class Hotbar : PanelContainer {
@@ -29,13 +29,13 @@ public partial class Hotbar : PanelContainer {
         AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = 1; AnchorBottom = 1; OffsetTop = -14; OffsetBottom = -14; GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Begin;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
-        slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), Style.Brick, "B"));
-        slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), Style.Sage, "Tab"));
-        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), new Color("b08a45"), "C"));
-        slots.AddChild(MenuIcon("map", "Recipe map", () => panel.Map.Open(), new Color("7d6488")));
-        slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), new Color("5f8aa6"), "H"));
+        slots.AddChild(MenuIcon("build", "build", "Build", () => panel.Open(Page.Build), new Color("4c4438"), "B"));
+        slots.AddChild(MenuIcon("bag", "backpack", "Backpack", () => panel.Open(Page.Backpack), new Color("414a3b"), "Tab"));
+        slots.AddChild(MenuIcon("craft", "crafting", "Crafting", () => panel.Open(Page.Craft), new Color("3d4c51"), "C"));
+        slots.AddChild(MenuIcon("map", "recipe_map", "Recipe map", () => panel.Map.Open(), new Color("4d4a3e")));
+        slots.AddChild(MenuIcon("crew", "crew", "Crew", () => panel.Open(Page.Crew), new Color("414b4d"), "H"));
         // The diary's badge waits for the player's first find.
-        DiaryBadge = MenuIcon("diary", "Diary", () => panel.Open(Page.Diary), new Color("8a6a4a"));
+        DiaryBadge = MenuIcon("diary", "diary", "Diary", () => panel.Open(Page.Diary), new Color("51454b"));
         DiaryBadge.Visible = false;
         unread = Style.Corner(new Panel { Name = "unread", MouseFilter = MouseFilterEnum.Ignore, CustomMinimumSize = new Vector2(16, 16) }, 1, 0, 2);
         unread.AddThemeStyleboxOverride("panel", Style.Flat(Style.Brick, 8, 0, Style.Rim, 2));
@@ -62,16 +62,24 @@ public partial class Hotbar : PanelContainer {
         tween.TweenProperty(DiaryBadge, "modulate:a", 1f, StampSeconds * .4f).From(0f);
     }
 
-    /// <summary>A round enamel badge with a line icon and a key cap when it has a shortcut.</summary>
-    private Button MenuIcon(string glyph, string tooltip, Action action, Color color, string? key = null) {
+    /// <summary>A matte badge with a colored illustration and a key cap when it has a shortcut.</summary>
+    private Button MenuIcon(string id, string art, string tooltip, Action action, Color color, string? key = null) {
         var button = kit.Button("", action);
-        button.Name = glyph; button.TooltipText = key == null ? tooltip : $"{tooltip} · {key}";
-        button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
+        button.Name = id; button.TooltipText = key == null ? tooltip : $"{tooltip} · {key}";
+        button.Icon = Icons.Of($"menu_{art}");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
-        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 28);
-        button.AddThemeColorOverride("icon_normal_color", Style.Rim); button.AddThemeColorOverride("icon_hover_color", Style.Rim); button.AddThemeColorOverride("icon_pressed_color", Style.Rim);
+        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 46);
+        button.AddThemeColorOverride("icon_normal_color", Colors.White);
+        button.AddThemeColorOverride("icon_hover_color", Colors.White);
+        button.AddThemeColorOverride("icon_pressed_color", Colors.White);
+        button.AddThemeColorOverride("icon_hover_pressed_color", Colors.White);
         button.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-        var look = Style.Round(color, 28); Style.Skin(button, look.Item1, look.Item2);
+        const int corner = 13;
+        const float rimLift = 28f / 255;
+        var rim = new Color(color.R + rimLift, color.G + rimLift, color.B + rimLift);
+        var normal = Style.Flat(color, corner, 0, rim, 1);
+        var hover = Style.Flat(color.Lightened(.1f), corner, 0, rim.Lightened(.14f), 1);
+        Style.Skin(button, normal, hover);
         if (key != null) button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
         return button;
     }

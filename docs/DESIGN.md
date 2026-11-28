@@ -60,7 +60,7 @@ These came from the user; change them only after asking.
   A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, nettle, leaf spot or
   wolf carcass.
   A tile cannot be clicked in normal play.
-- **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
+- **Taking down:** the red trash can in the building plans gives the remove selector: a building or path tile in reach
   turns red under the mouse and one click takes it down, with no question. Right-click switches layers and Esc exits.
   Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
@@ -231,7 +231,7 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
-| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges under the needs plate |
+| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges beside the Layer switch |
 | `src/food/display/FoodDescription.cs` | Hunger and food effects in item tooltips and the Recipe map sidebar |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
@@ -275,7 +275,7 @@ UI and input:
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
 | `src/actors/player/InteractionApproach.cs` | The player's cancellable walk to a selected thing before using it once |
 | `src/actors/player/WalkKeys.cs` | The movement keys and Shift held by code that plays the player: the performance run and the firebug chase |
-| `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
+| `src/ui/Hotbar.cs` | The tool belt: illustrated menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
 
@@ -302,7 +302,7 @@ Rendering and sound:
 | `src/WorldModels.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/glass/display/GlassBlowingView.cs` | The glass blowing pipe, its grip and aim, and the molten glass and finished jar in motion |
 | `src/glass/display/GlassJarShape.cs` | Open glass jar meshes and translucent finish for the icon, hands, and heaps |
-| `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs` | The person model, its joints and the shapes of its body (see [assets/README.md](../assets/README.md)) |
+| `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs`, `src/actors/display/HardHatShape.cs` | The person model, its joints and the shapes of its body and hard hat (see [assets/README.md](../assets/README.md)) |
 | `src/actors/display/Outfit.cs`, `src/actors/display/BodyBuild.cs` | The colours a person is drawn in, and the game's and the slim build of a body |
 | `src/actors/display/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/actors/display/RakeStroke.cs` | The rake's ground stroke and both hands' grips |
@@ -1865,6 +1865,7 @@ Dawn wages, settled strikes and hiring payments draw on every wage slot before t
 
 #### Price sheet
 
+The price sheet stays open beside the trading post while the player ships, hires or edits filters.
 The price sheet shows `SaveState.Prices`, a snapshot of sale prices.
 It is taken when a cart returns, or when a worker on the trading post's deliveries job comes back from a price errand (`Worker.Away`).
 Trades always use the live price, so the sheet can be out of date.
@@ -1889,6 +1890,7 @@ Workers fetch the pickaxe or hammer a stage needs from a tool station, like any 
 
 Up to `Mine.Workers` workers can be assigned to `JobKind.Mine`. Build and Haul jobs do not count toward this limit. `World.Assign` skips Mine when no slot is available and still adds Build and Haul.
 Miners work underground (`WorkerWorkState.Underground`, hidden by the view).
+`MinePanel` lights the hard hats for workers underground at that mine and names them on hover. Empty slots stay dim.
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
 A miner then carries a load of it to the nearest place that takes it (`Mines.Mine`), and with none the mine reports once that it is full and the mine job has nothing to do.

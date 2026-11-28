@@ -238,7 +238,7 @@ How they are framed:
 - Items show the part of a model that shows them in the world, such as a storage pile's logs.
 - Wood shows as a pair of logs and planks as three boards; wood parts as a handle, a grip and two pegs.
 - Goods that no world model shows have a model of their own in `ItemShape`, and show one of it.
-- The hard hat is the one workers wear, seen from nearly level so its brim and crown show apart.
+- The hard hat is the one workers wear, seen from nearly level so its rounded crown, low ridge and short peak show apart.
 - Berries show as a small heap of the bush's berries.
 - Buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
 - Tools are seen from the side, head up and to the right, and show only the head end (`IconRender.HeadShare` of their length): the head tells one tool from another, and a whole handle leaves it a few pixels at icon size. Everything else is seen from the game camera's angle under the game's sunlight.
@@ -249,13 +249,23 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash,
-  the goal popup's trophy and so on), tinted in code.
+- Colored menu illustrations named `menu_*` for Build, Backpack, Crafting, Recipe map, Crew and Diary on the bottom bar.
+  They sit on matte rounded-square badges and keep their own colors.
+  The Crafting header and the trading post's Workers tab use the same illustrations as their bottom-bar badges.
+- Line glyphs named `line_*` for panel controls and status badges, tinted in code.
+  The building plans use a trash can for the remove selector, jobs use a minus, and the close buttons use an X.
+  Crafting and the Goal Log use the same chevrons to show whether a group is open.
+- `trade_cart.svg`, `prices.svg` and `mailbox.svg` are colored illustrations for the trading post.
+  The cart carries crates, and the chart on the price sheet pairs a green rising line with a red falling line.
+  `hardhat_illustration.svg` shows the worker's tall hard hat on the price errand button.
+- Food effect glyphs show a sprinting boot for Carb load, a heart with a plus for Protein recovery, a heaped bowl for
+  Well fed and a shield for Vitamins. Their badges have distinct colors and sit to the right of the Layer switch.
 - `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
   loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
   writing in the dark does, ending in a stroke trailing down the page.
   They are imported at twice their size so they stay sharp.
-- `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
+- `fresh_water.svg` and `berry_jam.svg`, the loose liquids stations hold.
+  Fresh water is a blue droplet like the thirst icon, and Berry jam is a rounder drop with a berry mark.
 
 ## Fonts
 

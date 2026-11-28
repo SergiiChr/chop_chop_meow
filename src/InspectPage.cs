@@ -137,15 +137,20 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected void LoadBagGrid(Func<string, bool> wanted) =>
         BagGrid(id => world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: load a stack · Ctrl: all of it", wanted: wanted);
 
-    /// <summary>Whether the filter window is open beside the panel.</summary>
+    /// <summary>Whether the filter window is open.</summary>
     protected bool FiltersOpen => filters.Open;
 
-    /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
-    protected void FilterButton() {
-        var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, Style.FilterRound, "filters");
+    /// <summary>The funnel that opens the filter window, ringed while it is open.</summary>
+    protected void FilterButton((StyleBoxFlat Normal, StyleBoxFlat Hover)? look = null, bool inPage = false) {
+        var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, look ?? Style.FilterRound, "filters");
         if (!filters.Open) return;
-        Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover);
-        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, cursor, thing, filters, Redraw, (list, rows) => panel.ShowSheetRows(list, rows, hidesDrawer: true)));
+        if (look == null) Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover);
+        Action<ScrollContainer, Control> fit = inPage ? panel.ShowPageRows : (list, rows) => panel.ShowSheetRows(list, rows, hidesDrawer: true);
+        var window = new FilterWindow(kit, cursor, thing, filters, Redraw, fit);
+        if (inPage) {
+            var plate = new PanelContainer { MouseFilter = MouseFilterEnum.Pass };
+            plate.AddThemeStyleboxOverride("panel", Style.Plate); plate.AddChild(window); AddChild(plate);
+        } else panel.SideBoard(Style.Board, 340).AddChild(window);
     }
 
     /// <summary>The row of job buttons, for a place that offers jobs.</summary>

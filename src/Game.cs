@@ -170,19 +170,20 @@ public partial class Game : Node, IGameFlow {
         layerButton.CustomMinimumSize = new Vector2(48, 48);
         layerButton.AddThemeConstantOverride("icon_max_width", 24);
         layerButton.ToggleMode = true;
-        Style.Skin(layerButton, Style.TabRound.Normal, Style.TabRound.Hover, Style.TabActive.Normal);
+        Style.Skin(layerButton, Style.TabRound.Normal, Style.TabRound.Hover, Style.SlateTab.Normal);
         needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor);
         foodEffectRow = new FoodEffectRow(world);
+        var layerAndEffects = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        layerAndEffects.AddThemeConstantOverride("separation", 8);
+        layerAndEffects.AddChild(layerButton);
+        layerAndEffects.AddChild(foodEffectRow);
         needsPlate.ItemRectChanged += PlaceBelowNeeds;
-        foodEffectRow.ItemRectChanged += PlaceBelowNeeds;
-        foodEffectRow.VisibilityChanged += PlaceBelowNeeds;
-        ui.AddChild(needsPlate); ui.AddChild(foodEffectRow); ui.AddChild(layerButton); ui.AddChild(damageEdges);
+        ui.AddChild(needsPlate); ui.AddChild(layerAndEffects); ui.AddChild(damageEdges);
+        PlaceBelowNeeds();
 
         void PlaceBelowNeeds() {
             var status = needsPlate.GetRect();
-            var below = new Vector2(status.Position.X + 12, status.End.Y + 8);
-            if (foodEffectRow.Position != below) foodEffectRow.Position = below;
-            layerButton.Position = below + Vector2.Down * (foodEffectRow.Visible ? foodEffectRow.Size.Y + 8 : 0);
+            layerAndEffects.Position = new Vector2(status.Position.X + 12, status.End.Y + 8);
         }
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
         sheet = new ReadingSheet(kit); panel.ReadingSheet = sheet;

@@ -48,7 +48,7 @@ public abstract partial class PagePanel : VBoxContainer {
         if (!Current) { panel.Refresh(); return; }
         live.Clear();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
-        panel.ClearFrame();
+        panel.ClearFrame(redrawing: true);
         BuildWithBackpack();
         Refresh(); panel.Bag.Refresh();
     }
